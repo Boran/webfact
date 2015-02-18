@@ -38,17 +38,18 @@ class WebfactController {
     $this->docker_ports = array();
     $this->fqdn = '';
 
-    # Load configuration, override in settings.php
+    # Load configuration defaults, override in settings.php or on admin/config/development/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
-    $this->dserver   = variable_get('webfact_dserver', 'tcp://mydockerserver.example.ch:2375');
-    $this->fserver   = variable_get('webfact_fserver', 'mywildcard.example.ch');
+    //$this->dserver   = variable_get('webfact_dserver', 'tcp://mydockerserver.example.ch:2375');
+    $this->dserver   = variable_get('webfact_dserver', '/var/run/docker.sock');
+    $this->fserver   = variable_get('webfact_fserver', 'webfact.example.ch');
     $this->rproxy    = variable_get('webfact_rproxy', 'nginx');
-    $this->loglines  = variable_get('webfact_loglines', 100);
+    $this->loglines  = variable_get('webfact_loglines', 300);
     $this->restartpolicy = variable_get('webfact_restartpolicy', 'on-failure');
     $this->env_server  = variable_get('webfact_env_server');
-    $this->msglevel1 = variable_get('webfact_msglevel1', TRUE);   // normal infos
-    $this->msglevel2 = variable_get('webfact_msglevel2', FALSE);  // more
-    $this->msglevel3 = variable_get('webfact_msglevel3', FALSE);  // debug
+    $this->msglevel1 = variable_get('webfact_msglevel1', TRUE);  // normal infos
+    $this->msglevel2 = variable_get('webfact_msglevel2', TRUE);  // more
+    $this->msglevel3 = variable_get('webfact_msglevel3', TRUE);  // debug
 
     /*$log = new Logger('name');
       $log->pushHandler(new StreamHandler('/tmp/mono.log', Logger::WARNING));

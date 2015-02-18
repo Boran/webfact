@@ -1,0 +1,9 @@
+{
+    "name": "drupal/webfact",
+    "type": "drupal-module",
+    "description": "Webfactory provides allow mangement of docker containers as websites",
+    "require": {
+        "guzzlehttp/guzzle": "4.1.*",
+        "stage1/docker-php": "@dev"
+    }
+}

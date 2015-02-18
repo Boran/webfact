@@ -1,0 +1,212 @@
+<?php
+
+//require DRUPAL_ROOT . '/vendor/autoload.php';
+
+/**
+ * Implementation of hook_init().
+ */
+function webfact_init() {
+  drupal_add_css(drupal_get_path('module', 'webfact') . '/css/webfact.css',
+    array('group' => CSS_DEFAULT, 'every_page' => TRUE));
+
+  //require __DIR__ . '/vendor/autoload.php';
+}
+
+
+//function webfact_install(){
+//}
+
+
+function webfact_permission() {
+  return array(
+    'access websites' => array(
+      'title' => t('Access websites'),
+      'description' => t('Allow users to access website details'),
+    ),
+    'access templates' => array(
+      'title' => t('Access templates'),
+      'description' => t('Allow users to access website templates'),
+    ),
+    'manage containers' => array(
+      'title' => t('Manage Containers'),
+      'description' => t('Allow user full access to docker containers'),
+    ),
+  );
+}
+
+function webfact_menu() {
+  $items['website/%/%'] = array(
+    'page callback'    => 'webfact_arguments',
+    'page arguments'   => array(0, 1, 2),
+    'access arguments' => array('access websites'),
+    'type' => MENU_CALLBACK, // no menu
+  );
+
+  // admin form in Configuration > Development
+  $items['admin/config/development/webfact'] = array(
+    'title' => t('Webfactory'),
+    'description' => t('Webfactory docker URL and parameters'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('webfact_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );  
+
+  // bootstrap tests
+  $items['bob'] = array(   
+    'page callback'    => 'webfact_bootstrap',
+    'access arguments' => array('access websites'),
+    'type' => MENU_CALLBACK, // no menu
+  );
+  $items['site/%/%'] = array(
+    'page callback'    => 'webfact_bootstrap',
+    'page arguments'   => array(0, 1, 2),
+    'access arguments' => array('access websites'),
+    'type' => MENU_CALLBACK, // no menu
+  );
+  // angular tests
+  $items['webang'] = array(
+    'title'            => 'Angular test',
+    'page callback'    => 'webfact_angular',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK, // no menu
+  );
+  return $items;
+}
+
+
+// admin form
+function webfact_admin_settings() {
+  $form['webfact_fserver'] = array(
+    '#title' => t('Domain prefix'),
+    '#default_value' => variable_get('webfact_fserver', array('')),
+    '#description' => t('e.g. webfact.example.ch'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_dserver'] = array(
+    '#title' => t('Docker API URL'),
+    '#default_value' => variable_get('webfact_dserver', array('')),
+    '#description' => t('e.g. unix:///var/run/docker.sock or http://dock.example.ch:2375'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_cont_image'] = array(
+    '#title' => t('Base image for creating containers'),
+    '#default_value' => variable_get('webfact_cont_image', array('')),
+    '#description' => t('e.g. boran/drupal'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );  
+  $form['webfact_restartpolicy'] = array(
+    '#title' => t('New containers should autostart?'),
+    '#default_value' => variable_get('webfact_restartpolicy', array('on-failure')),
+    '#description' => t('The site default behaviour to apply when the container exits, or docker is booted. Either "always" or "on-failure" to restart only when the container exit code is non-zero. This can also be specified per container.'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 30,
+  );
+
+  $form['webfact_rproxy'] = array(
+    '#title' => t('Reverse proxy container ID'),
+    '#default_value' => variable_get('webfact_rproxy', array('nginx')),
+    '#description' => t('e.g. nginx'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_loglines'] = array(
+    '#title' => t('How many lines to tail on logs'),
+    '#default_value' => variable_get('webfact_loglines', array('')),
+    '#description' => t('e.g. 90'),
+    '#type' => 'textfield',
+    '#size' => 10,
+    '#maxlength' => 100,
+  );
+  $form['webfact_env_server'] = array(
+    '#title' => t('Optional: an environment variable to pass to all containers'),
+    '#default_value' => variable_get('webfact_env_server', array('')),
+    '#description' => t('To identify where containers were created. e.g. WEBFACT_SERVER=foo.example.ch'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_msglevel1'] = array(
+    '#title' => t('Level 1 messages to user: standard'),
+    '#default_value' => variable_get('webfact_msglevel1', true),
+    '#description' => t('Should always be enabled'),
+    '#type' => 'checkbox',
+    '#return_value' => 1,
+  );
+  $form['webfact_msglevel2'] = array(
+    '#title' => t('Level 2 messages to user: verbose'),
+    '#default_value' => variable_get('webfact_msglevel2', false),
+    '#type' => 'checkbox',
+    '#return_value' => 1,
+  );
+  $form['webfact_msglevel3'] = array(
+    '#title' => t('Level 3 messages to user: debugging'),
+    '#default_value' => variable_get('webfact_msglevel3', false),
+    '#type' => 'checkbox',
+    '#return_value' => 1,
+  );
+
+
+
+  return system_settings_form($form);
+}
+
+
+function webfact_theme() {
+  return array(
+    'bootstrap' => array(
+      'template' => 'bootstrap',
+    ),
+    'webfacts' => array(
+      'template' => 'webfacts',
+    ),
+  );
+}
+function webfact_angular() {
+  //$info = libraries_load('angularjs');
+  //dpm($info);
+  //drupal_add_library('angularjs', 'angularjs');
+  $path = drupal_get_path('module', 'webfact');
+  drupal_add_js($path . '/js/angular.min.js');
+  drupal_add_js($path . '/js/app.js');
+  return theme('webfacts');
+}
+
+function webfact_bootstrap($path='x', $action='y', $id=0) {
+  //dpm('webfact_bootstrap');
+  //drupal_set_message($action);
+  if (!is_numeric($id)) {      // only numbers: security
+    #drupal_access_denied();
+    return array('#markup' => '<p>' . t('Error: arguments not valid') . ",
+      path=$path, 1=$action, 2=$id" . '</p>');
+  }
+
+  return theme('bootstrap');
+}
+
+
+/* 
+ * hook for the /website/%/% page 
+ */
+function webfact_arguments($path, $action, $id) {
+  //drupal_set_message($action);
+  if (!is_numeric($id)) {      // only numbers: security
+    #drupal_access_denied();
+    return array('#markup' => '<p>' . t('Error: arguments not valid') . ", 
+      path=$path, 1=$action, 2=$id" . '</p>');
+  }
+
+  $w= new WebfactController;
+  //return $w->helloWorldPage();
+  return $w->arguments($action, $id);   // send back render array
+}
+
+

@@ -1,0 +1,18 @@
+;
+; Originally: Sean Boran
+
+name = Webfactory UI
+description = Managed websites docker containers
+
+#configure = admin/structure/somthing
+package = "Webfact"
+version = "7.x-1.x-dev"
+core = "7.x"
+
+files[] = controller.php
+stylesheets[all][] = css/webfact.css
+
+# for libraries such as guzzle
+dependencies[] = composer_manager
+
+

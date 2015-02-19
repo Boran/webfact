@@ -41,7 +41,7 @@ class WebfactController {
     # Load configuration defaults, override in settings.php or on admin/config/development/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
     //$this->dserver   = variable_get('webfact_dserver', 'tcp://mydockerserver.example.ch:2375');
-    $this->dserver   = variable_get('webfact_dserver', '/var/run/docker.sock');
+    $this->dserver   = variable_get('webfact_dserver', 'unix:///var/run/docker.sock');
     $this->fserver   = variable_get('webfact_fserver', 'webfact.example.ch');
     $this->rproxy    = variable_get('webfact_rproxy', 'nginx');
     $this->loglines  = variable_get('webfact_loglines', 300);

@@ -143,13 +143,13 @@ function webfact_admin_settings() {
   );
   $form['webfact_msglevel2'] = array(
     '#title' => t('Level 2 messages to user: verbose'),
-    '#default_value' => variable_get('webfact_msglevel2', false),
+    '#default_value' => variable_get('webfact_msglevel2', true),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
   $form['webfact_msglevel3'] = array(
     '#title' => t('Level 3 messages to user: debugging'),
-    '#default_value' => variable_get('webfact_msglevel3', false),
+    '#default_value' => variable_get('webfact_msglevel3', true),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );

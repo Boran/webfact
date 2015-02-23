@@ -19,3 +19,12 @@ Installation
 ----------------
 See the readme in the webfact-make repo.
 
+
+Programming notes
+-----------------
+See test.php cmdline.php for examples on using the apis and testing individual functions.
+* Tested with Docker API v1.15
+* The docker-php library (https://github.com/stage1/docker-php) 
+* The guzzle http client is used. This makes porting with Drupal8 (if fact the first attempt was on Drupal 8 and then focus was shifted back to D7), hence the dependancy on the composer_manager module
+
+

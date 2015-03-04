@@ -7,13 +7,13 @@ The Webfactory consists of several modules: webfact (main logic), webfact_conten
 You need:
   Docker server (e.g. Ubuntu 14.04) with docker 1.5 or later
   Container for the webfactory (e.g. the drupal lamp "boran/drupal" container)
-  This module and the webfactfeature module
+  This module and the modules above
   Some Drupal contrib modules.
-  Bootstrap theme and link in the theme function for status fields
+  Bootstrap theme
 
 Installation
 ----------------
-See the readme in the webfact-make repo.
+See the readme in the https://github.com/Boran/webfact-make repo.
 
 
 Programming notes

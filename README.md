@@ -8,6 +8,10 @@ You need:
   This module and the modules above
   Docker-php library
   Drupal + contrib modules and the bootstrap theme
+  
+Version
+-------
+This is still in early beta and in a state of flux, but actaully used on several servers. No version tagging yet.
 
 Installation
 ----------------

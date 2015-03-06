@@ -1,11 +1,12 @@
-The Webfactory provides a UI to interface to the Docker API, allowing operations on containers/images. It aims to streamline dev and operations for Drupal websites. See also https://github.com/Boran/webfact
+The Webfactory (https://github.com/Boran/webfact) provides a UI to interface to the Docker API, allowing operations on containers/images. It aims to streamline dev and operations for Drupal websites.
 
-The Webfactory consists of several modules: webfact (main logic), webfact_content_types (features/views), webfact_theme (bootstrap UI), webfact-make (build/install), webfactapi (optional remote control) and webfactory (deprecated).
-The boran/drupal docker image is a key part for Drupal automation too, although the webfactory can be used with other images of course.
+The Webfactory consists of several components
+ * The module: webfact (main logic), webfact_content_types (features/views), webfact_theme (bootstrap UI), webfact-make (build/install), webfactapi (optional remote control) and webfactory (deprecated).
+ * For Drupal build automation: The boran/drupal docker image (on docker hub).
 
 You need:
 * Docker server (e.g. Ubuntu 14.04) with docker 1.5 or later
-* Container for the webfactory (e.g. the drupal lamp "boran/drupal" container https://github.com/Boran/docker-drupal)
+* A container for the webfactory (e.g. the drupal lamp container https://github.com/Boran/docker-drupal)
 * Docker-php library 
 * Drupal + contrib modules and the bootstrap theme* 
 * This module and the modules above

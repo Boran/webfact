@@ -3,11 +3,11 @@ The Webfactory provides a UI to interface to the Docker API, allowing operations
 The Webfactory consists of several modules: webfact (main logic), webfact_content_types (features/views), webfact_theme (bootstrap UI), webfact-make (build/install), webfactapi (optional remote control) and webfactory (deprecated).
 
 You need:
-  Docker server (e.g. Ubuntu 14.04) with docker 1.5 or later
-  Container for the webfactory (e.g. the drupal lamp "boran/drupal" container)
-  This module and the modules above
-  Docker-php library
-  Drupal + contrib modules and the bootstrap theme
+* Docker server (e.g. Ubuntu 14.04) with docker 1.5 or later
+* Container for the webfactory (e.g. the drupal lamp "boran/drupal" container https://github.com/Boran/docker-drupal)
+* Docker-php library 
+* Drupal + contrib modules and the bootstrap theme* 
+* This module and the modules above
   
 Version
 -------
@@ -17,9 +17,11 @@ Installation
 ----------------
 See the readme in the https://github.com/Boran/webfact-make repo.
 
+
 TODO
 ----
-See the meta list https://github.com/Boran/webfact/issues/2
+The issue queue in this repo, and the meta list https://github.com/Boran/webfact/issues/2
+Lots of docs needed too.
 
 Programming notes
 -----------------

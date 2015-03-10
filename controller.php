@@ -1192,7 +1192,7 @@ END;
         $thismage = $imagemgr->find($this->id, $matches[1]);
 
         if ($action == 'imdel') {
-          $imagemgr->delete($thismage);
+          $imagemgr->remove($thismage);
           $this->message("Image $matches[0] deleted");
         }
 

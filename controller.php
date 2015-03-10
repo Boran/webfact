@@ -25,6 +25,7 @@ class WebfactController {
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $dserver, $fserver, $loglines, $env_server; // settings
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
+  protected $actual_restart, $actual_error, $actual_git;
 
 
   public function __construct() {
@@ -126,13 +127,123 @@ class WebfactController {
 
 
   /*
+   * bootstrap navigation on the website/advanced page
+   */ 
+  private function nav_menu($wpath) {
+    $rebuild_src_msg = "Backup, stop, delete and recreate " . $this->website->title .". Data in the container will be lost! Are you sure?";
+    $rebuild_meta_msg = "Backup, stop, delete and recreate from that same backup. i.e. to rebuild after changing an environment setting. Are you sure?";
+
+    $nav1 = <<<END
+      <nav class="navbar navbar-default">
+        <div class="container-fluid">
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="$wpath/advanced/$this->nid">Status</a>
+          </div>
+          <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Manage<span class="caret"></span></a>
+                <ul class="dropdown-menu" role="menu">
+                  <li><a href="$wpath/advanced/$this->nid">Status</a></li>
+                  <li><a href="$wpath/logs/$this->nid">Logs</a></li>
+                  <li><a href="$wpath/stop/$this->nid">Stop</a></li>
+                  <li><a href="$wpath/start/$this->nid">Start</a></li>
+                  <li><a href="$wpath/restart/$this->nid">Restart</a></li>
+                  <li class="divider"></li>
+                  <li><a href="$wpath/delete/$this->nid" onclick="return confirm('Are you sure?')">Delete</a></li>
+                  <li><a href="$wpath/create/$this->nid">Create</a></li>
+                </ul>
+              </li>
+            </ul> 
+
+            <ul class="nav navbar-nav">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Backup/restore<span class="caret"></span></a>
+                <ul class="dropdown-menu" role="menu">
+                  <li><a href="$wpath/backup/$this->nid">Backup container now</a></li>	
+				  <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
+				  <li class="divider"></li>
+                  <li><a href="$wpath/coexport/$this->nid" onclick="return confirm('Download this container to a tarfile? This will be slow as hundreds of MB are typical. ')">Download container</a></li>	  
+                </ul>
+              </li>
+            </ul> 
+
+            <ul class="nav navbar-nav">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Advanced<span class="caret"></span></a>
+                <ul class="dropdown-menu" role="menu">
+                  <li><a href="$wpath/inspect/$this->nid">Inspect</a></li>	
+                  <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
+                  <li class="divider"></li>
+                  <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild from sources</a></li>
+                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
+                  <li class="divider"></li>
+                  <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
+      <!--        <li><a href="$wpath/couploadfile/$this->nid">File Upload</a></li>	  -->
+                </ul>
+              </li>
+            </ul> 
+END;
+
+    ## Admin menu
+    if ( user_access('manage containers')) {
+      // Load the associated template
+      $tlink='';
+      if (isset($this->website->field_template['und'][0]['target_id'])) {
+        $tid=$this->website->field_template['und'][0]['target_id'];
+        if (isset($tid)) { 
+          $tlink="<li><a href=/node/$tid/edit$des>Edit template</a></li> "; 
+        }
+      }
+      $nav2 = <<<END
+            <ul class="nav navbar-nav navbar-right">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Docker Admin<span class="caret"></span></a>
+                <ul class="dropdown-menu" role="menu">
+                  <li><a href="$wpath/version/$this->nid">Docker version</a></li>
+                  <li><a href="$wpath/containers/$this->nid">Containers</a></li>
+                  <li><a href="$wpath/images/$this->nid">Images</a></li>
+                  <li class="divider"></li>
+                  $tlink
+                  <li><a href="$wpath/processes/$this->nid">Container processes</a></li>
+                  <li><a href="$wpath/kill/$this->nid">Container kill</a></li>
+                  <li><a href="$wpath/impull/$this->nid" onclick="return confirm('Pulling the base image from Dockerhub will affect all future builds using that image. Are you sure you sure?')">Pull latest image</a></li>
+                  <li><a href="$wpath/changes/$this->nid">Container fs changes</a></li>
+                  <li class="divider"></li>
+                  <li><a href="$wpath/proxyrestart/0$this->des" onclick="return confirm('Restarting nginx will break all sessions, refresh the page manually after a few secs. ')">Restart nginx</a></li>
+                  <li><a href="$wpath/proxy2restart/0$this->des">Restart nginx-gen</a></li>
+                  <li><a href="$wpath/proxylogs/0$this->des">Logs nginx</a></li>
+                  <li><a href="$wpath/proxy2logs/0$this->des">Logs nginx-gen</a></li>
+                </ul>
+              </li>
+            </ul> 
+END;
+      } else {
+        $nav2='';
+      }
+      $navend = <<<END
+          </div><!--/.nav-collapse -->
+        </div><!--/.container-fluid -->
+      </nav>
+END;
+      return $nav1 . $nav2 . $navend;
+  }
+
+
+
+  /* 
    * load the meta spec for a container from the website and template
    */
   private function load_meta() {
     $this->docker_start_vol=array();
     $this->docker_vol=array();
     $this->docker_env=array();
-
 
     // Initial docker environment variables
     // todo: should only be for Drupal sites?
@@ -304,6 +415,27 @@ class WebfactController {
   }  // function
 
 
+  public function getGit() {
+    // todo: improve the command, or make it a setting?
+    $cmd = "cd /var/www/html && if [ -d '.git' ] ; then git log -n 1 --date=short --abbrev-commit --pretty=oneline; fi";
+
+    $this->actual_git = '';
+    $manager = $this->getContainerManager();
+    $container = $manager->find($this->id);
+    if (($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
+      return;
+    }
+    $execid = $manager->exec($container, ['/bin/bash', '-c', $cmd]);
+    #dpm("Exec ID= <" . $execid. ">\n");
+    $result = $manager->execstart($execid);
+    #$this->actual_git = $result->getBody();    // todo
+    #dpm($result->getBody());   // todo: crap??
+    $this->actual_git = $result->__toString();  // todo, get body
+    #dpm($result->getStatusCode());
+    #dpm($result->__toString());
+  }
+
+
   public function getStatus($nid) {
     $runstatus = 'n/a';
     if (! is_numeric($nid) ) {
@@ -344,8 +476,20 @@ class WebfactController {
         $runstatus = 'stopped';
       }
     }
+
+    // grab some more key run info
+    #dpm($cont);
+    $this->actual_restart='';
+    if (isset($cont['HostConfig']['RestartPolicy'])) {
+      $this->actual_restart= $cont['HostConfig']['RestartPolicy']['Name'];
+    }
+    $this->actual_error='none';
+    if (isset($cont['State']['Error'])) {
+      $this->actual_error= $cont['State']['Error'] . '.';
+    }
     return $runstatus;
   }
+
 
   public function message($msg, $status='status', $msglevel=1) {
     if (($msglevel==1) && ($this->msglevel1)) {
@@ -1148,7 +1292,7 @@ class WebfactController {
             $imagearg = $imagename . '&destination=' . $destination['destination']; // remember where we were
             #print("$imageline " . "\n");
 
-$html = <<<END
+            $html = <<<END
 <!-- Bootstrap: -->
 <div class="row">
 <div class="col-xs-3"><p>$imagename</p></div>
@@ -1193,7 +1337,7 @@ END;
       case 'cocmd':  
         $this->client->setDefaultOption('timeout', 30);
         $this->markup = '<div class="container-fluid">';
-$html = <<<END
+        $html = <<<END
 <!-- Bootstrap: -->
 <form >
 <fieldset>
@@ -1234,7 +1378,7 @@ END;
 
           $execid = $manager->exec($container, ['/bin/bash', '-c', $cmd]);
           #dpm("Exec ID= <" . $execid. ">\n");
-          $result=$manager->execstart($execid);
+          $result = $manager->execstart($execid);
           $this->markup .= "<pre>Output of the command '$cmd':<br>" . $result->__toString() . '</pre>';
         }
         break;
@@ -1247,7 +1391,7 @@ END;
           $this->message("$this->id does not exist");
           break;
         }
-$html = <<<END
+        $html = <<<END
 <!-- Bootstrap: -->
 <form action="/website/couploadfile/$this->nid" method="post" enctype="multipart/form-data">
 <fieldset>
@@ -1273,9 +1417,8 @@ $html = <<<END
 </form>
 END;
         $this->markup .= $html;
-
-$this->message("file upload not yet implemented", "error");
-break;
+        $this->message("file upload not yet implemented", "error"); // TODO
+        break;
 
         # 1. Upload the file to this webserver
         if(isset($_POST["submit"])) {
@@ -1301,12 +1444,12 @@ break;
         #$execid = $manager->exec($container, ["/bin/bash", "-c", "cat >/tmp/upload.file"]);
         #$result=$manager->execstart($execid);
 */
-//XX
+//TODO
         break;
 
 
       case 'cocopyfile':     // download a folder from the container
-$html = <<<END
+        $html = <<<END
 <!-- Bootstrap: -->
 <form >
 <fieldset>
@@ -1448,7 +1591,9 @@ END;
     $wpath='/website';
     $destination = drupal_get_destination();
     $des = '?destination=' . $destination['destination']; // remember where we were
+    $nav = $this->nav_menu($wpath);
 
+/*  see nav_menu()
     if (isset($this->website->title) ){
       $part2 = '';
       $part2 .='<div class=container-fluid>';
@@ -1522,13 +1667,14 @@ END;
         .  "</div>";
     $part2 .= "</div>";
     $part2.= '<div class="clearfix"></div>';
-
+*/
 
     // send back the HTML to be shown on the page
     $render_array['webfact_arguments'] = array();
     // prepare the top, summary part of the page
     $fqdn="http://$this->id.$this->fserver";
     $description ='';
+
     // prepare colour status
     $statushtml='<div class=website-status>';
     if ( ($runstatus == 'running') || ($runstatus == 'stopped') ) {
@@ -1538,43 +1684,55 @@ END;
       $statushtml .= "$runstatus";
     }
     $statushtml .= '</div>';
+
     if ($this->website) {
       $description .='<div class=container-fluid>';
       $description .='<h3>' . $this->website->title . '</h3>'
-       #. "<div class=col-xs-2>Run status:</div> <div class=col-xs-10>$runstatus</div>"
-       . "<div class=col-xs-2>Run status:</div> <div class=col-xs-10>$statushtml</div>"
-       . "<div class=col-xs-2>Category:</div> <div class=col-xs-10>$this->category</div>"
-       . "<div class=col-xs-2>Website:</div> <div class=col-xs-10>"
-       .   "<a target=_blank href=///$this->id.$this->fserver>$this->id.$this->fserver</a>"
-       .   "</div>"
+       . "<div class=col-xs-6><a href=/node/$this->nid/edit$des>Meta data</a></div>"
+       . "<div class=col-xs-6><strong>Actual</strong></div>"
+
+       . "<div class=col-xs-2>Website:</div> <div class=col-xs-4>"
+       .   "<a target=_blank href=///$this->id.$this->fserver>$this->id.$this->fserver</a></div>"
+       . "<div class=col-xs-2>Run status:</div> <div class=col-xs-4>$statushtml</div>"
+
+       . "<div class=col-xs-2>Category:</div> <div class=col-xs-4>$this->category</div>"
+       . "<div class=col-xs-2>Error:</div> <div class=col-xs-4>$this->actual_error</div>"
+
+       . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>$this->restartpolicy</div>"
+       . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>$this->actual_restart</div>"
+
        . "<div class=col-xs-2>Owner:</div> <div class=col-xs-10>$owner</div>"
       ;
       if (isset($this->website->body['und'][0]['safe_value'])) {
         $description.= "<div class=col-xs-2>Description:</div> <div class=col-xs-10>"
           . $this->website->body['und'][0]['safe_value'] . "</div>";
       }
-      $description.= "<div class=col-xs-2>Auto start:</div> <div class=col-xs-10>"
-          . $this->restartpolicy . "</div>";
-      $description.= '</div>';
-        #. " <a href=/node/$this->nid/edit$des>Edit meta data</a> | "
-      $description.= "<div class=col-xs-2><a href=/node/$this->nid/edit$des>Edit meta data</a></div> <div class=col-xs-10></div>";
-      $description.= '</div>';
+      $this->getGit();    // grab git status
+      if (strlen($this->actual_git)>0) {
+        $description .= "<div class=col-xs-2>Last git commit:</div> <div class=col-xs-10>$this->actual_git</div>";
+      }
+      $description.= '</div></div>';
     }
     $description.= '<div class="clearfix"></div>';
 
     $render_array['webfact_arguments'][0] = array(
       '#type'   => 'markup',
+      '#markup' => $nav,
+    );
+    $render_array['webfact_arguments'][1] = array(
+      '#type'   => 'markup',
       '#markup' => $description,
     );
-
-    $render_array['webfact_arguments'][1] = array(
+/*
+    $render_array['webfact_arguments'][2] = array(
       '#type'   => 'markup',
       '#markup' => $part2,
       '#result' => $this->result,
       '#status' => $this->status,
     );
+*/
     if (!empty($this->markup) ) {
-      $render_array['webfact_arguments'][2] = array(
+      $render_array['webfact_arguments'][3] = array(
         '#type' => 'markup',
         '#markup' => '<h3> </h3>' . $this->markup,
       );

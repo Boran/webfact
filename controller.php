@@ -181,6 +181,8 @@ class WebfactController {
                   <li><a href="$wpath/inspect/$this->nid">Inspect</a></li>	
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   <li class="divider"></li>
+                  <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
+                  <li class="divider"></li>
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild from sources</a></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
                   <li class="divider"></li>
@@ -415,24 +417,41 @@ END;
   }  // function
 
 
-  public function getGit() {
-    // todo: improve the command, or make it a setting?
-    $cmd = "cd /var/www/html && if [ -d '.git' ] ; then git log -n 1 --date=short --abbrev-commit --pretty=oneline; fi";
+  /*
+   * run a commind inside the conatiner and give back the results
+   */
+  protected function runCommand($cmd) {
+    // todo: 
+    // - check status code and do a watchdog or interactive error?
 
-    $this->actual_git = '';
     $manager = $this->getContainerManager();
     $container = $manager->find($this->id);
-    if (($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
-      return;
+    if ((strlen($cmd)<1) || ($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
+      return;  // container not running, abort
     }
+
+    $this->message("Running command: $cmd", 'status', 4);
     $execid = $manager->exec($container, ['/bin/bash', '-c', $cmd]);
     #dpm("Exec ID= <" . $execid. ">\n");
-    $result = $manager->execstart($execid);
-    #$this->actual_git = $result->getBody();    // todo
-    #dpm($result->getBody());   // todo: crap??
-    $this->actual_git = $result->__toString();  // todo, get body
-    #dpm($result->getStatusCode());
-    #dpm($result->__toString());
+    #$response = $manager->execstart($execid, function(){} ,false,false);
+    $response = $manager->execstart($execid);
+    #dpm($response->getStatusCode());
+    #dpm($response->__toString());
+    if ($body = $response->getBody()) {
+      $body->seek(0);
+      $result = $body->read(4096); // get first 4k
+    }
+    #dpm($result);
+    return(trim($result));
+  }
+
+  protected function getGit() {
+    // todo: improve the command, or make it a setting?
+    #$cmd = "cd /var/www/html && if [ -d '.git' ] ; then git log -n 1 --date=short --abbrev-commit --pretty=oneline; fi";
+    #$cmd = "cd /var/www/html && if [ -d '.git' ] ; then git log -n 1 --date=short --abbrev-commit --pretty=medium; fi";
+    $cmd = "cd /var/www/html && if [ -x 'webfact_status.sh' ] ; then ./webfact_status.sh; fi";
+    #$cmd = "cd /var/www/html && ls";
+    $this->actual_git = $this->runCommand($cmd);
   }
 
 
@@ -732,6 +751,31 @@ END;
       }
 
 
+      else if ($this->action=='coappupdate') {
+        global $base_root;
+        $this->client->setDefaultOption('timeout', 30);
+        // Stop accidental deleting of key containers
+        #if (stristr($this->category, 'production')) {
+        #  $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
+        #  return;
+        #}
+        if (! $container) {
+          $this->message("$this->id does not exist", 'warning');
+          return;
+        }
+        // backup, stop, delete:
+        watchdog('webfact', "coappupdate - backup, update", WATCHDOG_NOTICE);
+        $config = array('tag' => date('Ymd') . '-before-update', 'repo' => $this->id, 'author' => $this->user,
+          'comment' => "saved before app update on $base_root",
+        );
+        $savedimage = $this->docker->commit($container, $config);
+        $this->message("Saved to " . $savedimage->__toString(), 'status', 3);
+        $this->message("Run webfact_update.sh (see results below)", 'status', 2);
+        $logs = $this->runCommand("cd /var/www/html && ./webfact_update.sh");
+        $this->markup = "<h3>Update results</h3><pre>$logs</pre>";   // show output
+        return;
+      }
+
       else if ($this->action=='rebuildmeta') {
         global $base_root;
         $this->client->setDefaultOption('timeout', 30);
@@ -999,6 +1043,7 @@ END;
         case 'unpause':
         case 'rebuild':
         case 'rebuildmeta':
+        case 'coappupdate':
         case 'logs':
         case 'processes':
         case 'logtail':
@@ -1100,6 +1145,7 @@ END;
       case 'create':
       case 'rebuild':
       case 'rebuildmeta':
+      case 'coappupdate':
         if (($this->user!=$owner) && (! user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
@@ -1366,12 +1412,15 @@ END;
         $this->markup .= $html;
         $_url = drupal_parse_url($_SERVER['REQUEST_URI']);
         if (isset ($_url['query']['cmd']) ) {
+          $cmd = $_url['query']['cmd'];   // todo: security checking?
+          $result = $this->runCommand($cmd);
+          $this->markup .= "<pre>Output of the command '$cmd':<br>" . $result . '</pre>';
+/*
           $container = $manager->find($this->id);
           if ($container->getRuntimeInformations()['State']['Running'] == FALSE) {
             $this->message("$this->id must be started", 'warning');
             break;
           }
-          $cmd = $_url['query']['cmd'];   // todo: security checking?
           // todo: if cmd had several parts, create an array?
           #$cmds = preg_split ('/[\s]+/', $cmd);
           #$execid = $manager->exec($container, $cmds);
@@ -1380,6 +1429,7 @@ END;
           #dpm("Exec ID= <" . $execid. ">\n");
           $result = $manager->execstart($execid);
           $this->markup .= "<pre>Output of the command '$cmd':<br>" . $result->__toString() . '</pre>';
+*/
         }
         break;
 
@@ -1696,7 +1746,7 @@ END;
        . "<div class=col-xs-2>Run status:</div> <div class=col-xs-4>$statushtml</div>"
 
        . "<div class=col-xs-2>Category:</div> <div class=col-xs-4>$this->category</div>"
-       . "<div class=col-xs-2>Error:</div> <div class=col-xs-4>$this->actual_error</div>"
+       . "<div class=col-xs-2><abbr title='If docker operations failed, an explanation may be show here'>Error</abbr>:</div> <div class=col-xs-4>$this->actual_error</div>"
 
        . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>$this->restartpolicy</div>"
        . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>$this->actual_restart</div>"
@@ -1707,10 +1757,14 @@ END;
         $description.= "<div class=col-xs-2>Description:</div> <div class=col-xs-10>"
           . $this->website->body['und'][0]['safe_value'] . "</div>";
       }
+
+      $description.= '<div class="clearfix"></div><h4>Run time:</h4>';
+      $uptime = $this->runCommand('uptime');
+      $description.= "<div class=col-xs-2><abbr title='Result of the uptime command run within the container'>Uptime</abbr>:</div> <div class=col-xs-10>$uptime</div>";
       $this->getGit();    // grab git status
-      if (strlen($this->actual_git)>0) {
-        $description .= "<div class=col-xs-2>Last git commit:</div> <div class=col-xs-10>$this->actual_git</div>";
-      }
+      #if (strlen($this->actual_git)>0) {
+        $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-10>$this->actual_git</div>";
+      #}
       $description.= '</div></div>';
     }
     $description.= '<div class="clearfix"></div>';

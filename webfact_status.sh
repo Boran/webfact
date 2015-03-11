@@ -9,7 +9,9 @@ cd /var/www/html
 if [ -d '.git' ] ; then
   lastcommit=` git log -n 1 --date=short --abbrev-commit --pretty=oneline 2>&1 `;
   remote=`git remote -v 2>&1|grep fetch|awk '{print $2}' `
-  echo "Last commit: '$lastcommit',  remote=$remote";
+  #changes=`git status -s -b 2>&1 `
+  #echo "Last commit: '$lastcommit', remote=$remote, changes=$branch";
+  echo "Last commit: '$lastcommit', remote=$remote";
 else
   echo "no git repo in /var/www/html";
 fi

@@ -9,6 +9,13 @@
 echo "Running webfact_update.sh";
 cd /var/www/html
 if [ -d '.git' ] ; then
+  echo "-- todo: dump the db and files to /data (or other external volume)"
+  if [ -x /root/backup.sh ] ; then
+    echo "-- backup: running /root/backup.sh /data"
+  fi;
+  #echo "-- todo: dump the db and files to /data (or other external volume)"
+
+
   echo "-- git pull"
   git pull
   echo "todo: how to use save/use credientials for git? "

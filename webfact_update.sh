@@ -16,12 +16,11 @@ if [ -d '.git' ] ; then
   fi;
 
   echo "-- git pull for /var/www"
-  #echo "todo: how to use save/use credientials for git? "
   git pull
-
+  # todo: if credential are needed, somehow add them to /root/.netrc
 
   echo " "
-  echo "-- last two git logs:"
+  echo "-- last two git logs /var/www"
   git log -2 --pretty=email
 else
   echo "no git repo in /var/www/html";
@@ -29,10 +28,10 @@ fi
 
 
 echo "-- git pull for webfact components: module, theme, webfact_content_types, webfactapi:"
-(cd sites/all/modules/custom/webfact && git pull)
-(cd sites/all/themes/webfact_theme && git pull)
-(cd sites/all/modules/custom/webfact_content_types/ && git pull)
-(cd sites/all/modules/custom/webfactapi && git pull)
+(cd sites/all/modules/custom/webfact    && git pull origin master)
+(cd sites/all/themes/webfact_theme      && git pull origin master)
+(cd sites/all/modules/custom/webfact_content_types/ && git pull origin master)
+(cd sites/all/modules/custom/webfactapi && git pull origin master)
 
 
 # finally:

@@ -129,7 +129,7 @@ class WebfactController {
   /*
    * bootstrap navigation on the website/advanced page
    */ 
-  private function nav_menu($wpath) {
+  private function nav_menu($wpath, $des) {
     $rebuild_src_msg = "Backup, stop, delete and recreate " . $this->website->title .". Data in the container will be lost! Are you sure?";
     $rebuild_meta_msg = "Backup, stop, delete and recreate from that same backup. i.e. to rebuild after changing an environment setting. Are you sure?";
 
@@ -1641,7 +1641,7 @@ END;
     $wpath='/website';
     $destination = drupal_get_destination();
     $des = '?destination=' . $destination['destination']; // remember where we were
-    $nav = $this->nav_menu($wpath);
+    $nav = $this->nav_menu($wpath, $des);
 
 /*  see nav_menu()
     if (isset($this->website->title) ){

@@ -182,6 +182,9 @@ class WebfactController {
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
+<!-- coosupdate prototype, not ready:
+                  <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup, Stop+rename the container, create new container and resotore data&DB?')">Run container OS update</a></li>
+-->
                   <li class="divider"></li>
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild from sources</a></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
@@ -237,6 +240,42 @@ END;
       return $nav1 . $nav2 . $navend;
   }
 
+
+  /*
+   * create a container: test fucntion, really abtract this bit out?
+   * implementation does not smell good!
+   */
+  public function create($verbose = 0) {   // create a container
+     // todo: make sure $id and all "this" stuff is loaded
+     $manager = $this->getContainerManager();
+
+     // create the container
+        $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
+                   'Env'  => $this->docker_env, 'Volumes'  => $this->docker_vol
+        ];
+        #dpm($config);
+        $container= new Docker\Container($config);
+        $container->setName($this->id);
+        $manager->create($container);
+
+     // start
+        #dpm($this->startconfig);
+        $manager->start($container, $this->startconfig);
+
+        $msg= "$this->action $this->id: title=" . $this->website->title
+          . ", docker image=$this->cont_image" ;
+        watchdog('webfact', $msg);
+
+        if ($verbose == 1) {
+          $this->message($msg, 'status', 2);
+          // inform user:
+          $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
+          $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
+          $this->message("Provisioning: you can connect to the new site at $newtime.", 'status');
+          drupal_goto("/website/advanced/$this->nid"); // show new status
+        }
+        return;
+  }
 
 
   /* 
@@ -442,7 +481,7 @@ END;
       $result = $body->read(4096); // get first 4k
     }
     #dpm($result);
-    return(trim($result));
+    return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
   }
 
   protected function getGit() {
@@ -751,9 +790,70 @@ END;
       }
 
 
+/*
+      else if ($this->action=='coosupdate') {
+        global $base_root;
+        $this->client->setDefaultOption('timeout', 60);   // backups can take time
+        if (! $container) {
+          $this->message("$this->id does not exist", 'warning');
+          return;
+        }
+        if ($this->getStatus($this->nid) != 'running' ) {
+          $this->message("The container is not running.", 'error');
+          return;
+        }
+
+        // preconditions:
+        // a) if /data a volume, does sit have a mapping to a host directory?
+        $datavolsrc = '/data'; // todo: parameter
+        $datavol = $container->getRuntimeInformations()['Volumes'];
+        if (! isset($datavol[$datavolsrc]) ) {
+          $this->message("The container does not have a $datavolsrc volume.", 'error');
+          #dpm($datavol);
+          return;
+        } else {
+          $datavolmap = $datavol[$datavolsrc]; 
+          if (strlen($datavolmap)<1) {
+            $this->message("The container does not have a $datavolsrc volume mapped to a server directory.", 'error');
+            #dpm($datavolmap);
+            return;
+          }
+        }
+        #dpm($datavolmap);
+
+        // b) /root/backup.sh exists
+        $backup="/root/backup.sh";
+        $ret = $this->runCommand("if [[ -x $backup ]] && [[ -d $datavolsrc ]]; then echo 'OK'; else echo 'NOK'; fi;");
+        //if ( strcmp($answer, 'OK')!==0 ) {  //note: $ret!= 'OK' does not work
+        if ($ret!= 'OK') {
+          #dpm($ret);
+          $this->message("The container does not have $backup or $datavolsrc", 'error');
+          $logs = $this->runCommand(" ls -al $backup $datavolsrc;");
+          $this->markup = "<h3>Update results</h3>ls -al $backup $datavolsrc :<pre>$logs</pre>";   // show output
+          return;
+        }
+
+        // process
+        watchdog('webfact', "coappupdate - backup, update", WATCHDOG_NOTICE);
+        $this->message("Run /root/backup.sh (see results below)", 'status', 2); // check result?
+        $logs = $this->runCommand("/root/backup.sh && ls -altr /data");
+        $this->message("Stop $this->id", 'status', 3);
+        $manager->stop($container);
+        $this->message("Rename $this->id to $this->id" . '-preupdate', 'status', 3);
+        $manager->rename($container, $this->id . '-preupdate');
+        $this->message("Create new $this->id (but how do we know when it is done?)", 'status', 3);
+        $this->create();    // new container from meta data
+
+        $logs .= "<br>, stopping, renaming";
+        $this->markup = "<h3>Update results</h3>Run /root/backup.sh && ls -altr /data :<pre>$logs</pre>";   // show output
+        return;
+      }
+*/
+
+
       else if ($this->action=='coappupdate') {
         global $base_root;
-        $this->client->setDefaultOption('timeout', 30);
+        $this->client->setDefaultOption('timeout', 60);   // backups can take time
         // Stop accidental deleting of key containers
         #if (stristr($this->category, 'production')) {
         #  $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
@@ -773,6 +873,8 @@ END;
         $this->message("Run webfact_update.sh (see results below)", 'status', 2);
         $logs = $this->runCommand("cd /var/www/html && ./webfact_update.sh");
         $this->markup = "<h3>Update results</h3><pre>$logs</pre>";   // show output
+        $this->message("stop ", 'status', 3);
+        $manager->stop($container);
         return;
       }
 
@@ -1044,6 +1146,7 @@ END;
         case 'rebuild':
         case 'rebuildmeta':
         case 'coappupdate':
+        case 'coosupdate':
         case 'logs':
         case 'processes':
         case 'logtail':
@@ -1146,6 +1249,7 @@ END;
       case 'rebuild':
       case 'rebuildmeta':
       case 'coappupdate':
+      case 'coosupdate':
         if (($this->user!=$owner) && (! user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
@@ -1746,10 +1850,10 @@ END;
        . "<div class=col-xs-2>Run status:</div> <div class=col-xs-4>$statushtml</div>"
 
        . "<div class=col-xs-2>Category:</div> <div class=col-xs-4>$this->category</div>"
-       . "<div class=col-xs-2><abbr title='If docker operations failed, an explanation may be show here'>Error</abbr>:</div> <div class=col-xs-4>$this->actual_error</div>"
+       . "<div class=col-xs-2><abbr title='If docker operations failed, an explanation may be show here'>Error</abbr>:</div> <div class=col-xs-4>($this->actual_error)</div>"
 
        . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>$this->restartpolicy</div>"
-       . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>$this->actual_restart</div>"
+       . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>($this->actual_restart)</div>"
 
        . "<div class=col-xs-2>Owner:</div> <div class=col-xs-10>$owner</div>"
       ;

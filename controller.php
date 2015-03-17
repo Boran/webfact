@@ -167,8 +167,10 @@ class WebfactController {
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Backup/restore<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
                   <li><a href="$wpath/backup/$this->nid">Backup container now</a></li>	
-				  <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
-				  <li class="divider"></li>
+		  <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
+		  <li class="divider"></li>
+                  <li><a href="$wpath/backuplistdelete/$this->nid" onclick="return confirm('Sure?')">Remove ALL backups of $this->id</a></li>
+		  <li class="divider"></li>
                   <li><a href="$wpath/coexport/$this->nid" onclick="return confirm('Download this container to a tarfile? This will be slow as hundreds of MB are typical. ')">Download container</a></li>	  
                 </ul>
               </li>
@@ -1152,6 +1154,7 @@ END;
         case 'logtail':
         case 'backup':
         case 'backuplist':
+        case 'backuplistdelete':
         case 'imdel':
         case 'imres':
         case 'impull':
@@ -1467,6 +1470,31 @@ END;
         }
         $this->markup .= '</div>';
         break;
+
+      case 'backuplistdelete':  // list images of current container
+        $this->client->setDefaultOption('timeout', 120);
+        // todo: cache the image list for speed
+        if (($this->user!=$owner) && (!user_access('manage containers')  )) {
+          $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
+          break;
+        }
+        $imagemgr = $this->getImageManager();
+        $images = $imagemgr->findAll();
+        $this->markup .= '<div class="container-fluid">';
+        $this->markup .= "<h3>Delete all backup images of $this->id</h3>";
+        $imagenid = $this->nid;
+        foreach ($images as $image) {
+          if (! strcmp($this->id, $image->getRepository())) {
+            $data = $imagemgr->inspect($image);
+            $imagename = $image->__toString();
+            $this->message("Deleting $imagename");
+            $imagemgr->remove($image);
+          }
+        }
+        $this->message("Deleting done");
+        $this->markup .= '</div>';
+        break;
+
 
       case 'backup':  // commit a container to an image
         global $base_root;

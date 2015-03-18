@@ -907,10 +907,11 @@ END;
 
       else if ($this->action=='rebuildmeta') {
         global $base_root;
-        $this->client->setDefaultOption('timeout', 30);
+        $this->client->setDefaultOption('timeout', 60);
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
-          $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
+          $this->message("$this->id is categorised as production, rebuild not allowed.", 'error');
+          drupal_goto("/website/advanced/$this->nid"); // go back to status page
           return;
         }
         if (! $container) {
@@ -944,7 +945,8 @@ END;
 
         $this->action='create';
         $this->contAction(0);     // 0=no verbose message
-        $this->message("Click on 'inspect' to verify the new environment", 'status', 2);
+        $this->message("Click on 'inspect' to verify the new environment. You may also wish to reset the category and docker image in the meta data.", 'status', 2);
+        drupal_goto("/website/advanced/$this->nid"); // go back to status page
         return;
       }
 

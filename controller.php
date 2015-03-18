@@ -64,7 +64,7 @@ class WebfactController {
     $this->client = new Docker\Http\DockerClient(array(), $this->dserver);
     #$this->client = new Docker\Http\DockerClient(array(), 'tcp://195.176.209.22:2375');
     # 'unix:///var/run/docker.sock'
-    $this->client->setDefaultOption('timeout', 15);     // default should be a parameter?
+    $this->client->setDefaultOption('timeout', 30);     // default should be a parameter?
     $this->docker = new Docker\Docker($this->client);
   }
 
@@ -244,7 +244,27 @@ END;
 
 
   /*
-   * create a container: test fucntion, really abtract this bit out?
+   * stop or delete a container by name
+   * no checking on permissions,
+   * todo: this is an experimental abstraction, initially used in hook_node_delete()
+   */
+  public function deleteContainer($name) {  
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+
+     // todo: use nid, not name, and check if in production?
+     #   if (stristr($this->category, 'production')) {
+     #     $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
+     #     return;
+     #   }
+     $manager->stop($container);
+     $manager->remove($container);
+     watchdog('webfact', "deleteContainer $name");
+  }
+
+
+  /*
+   * create a container: test fucntion, really abstract this bit out?
    * implementation does not smell good!
    */
   public function create($verbose = 0) {   // create a container
@@ -282,6 +302,7 @@ END;
 
   /* 
    * load the meta spec for a container from the website and template
+   * todo: what is $this-> is not loaded?
    */
   private function load_meta() {
     $this->docker_start_vol=array();

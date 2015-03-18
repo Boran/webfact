@@ -209,4 +209,25 @@ function webfact_arguments($path, $action, $id) {
   return $w->arguments($action, $id);   // send back render array
 }
 
+/*
+ * hook_node_delete()
+ * After deleting website meta data, delete the container too
+ * TODO: 
+ * a) what about backup images?
+ * b) Only delete if category<>production, but the node will still be gone?
+ * ideally there needs to be a pre and post delete hook.
+ */
+function webfact_node_delete($node) {
+  if ($node->type == 'website') {
+    //dpm($node);
+    $w = new WebfactController;
+    $w->deleteContainer($node->title); 
+    drupal_set_message("Note: backup images of $node->title have not been deleted, these are removed automatically during weekly cleanup.");
+    // todo: if there is a destination back to /something/nid, delete it
+    //if (isset($_GET['destination'])) {  // go back where we were
+    //  $from = drupal_parse_url($_GET['destination']);
+    //}
+  }
+}
+
 

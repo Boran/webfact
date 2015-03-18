@@ -1100,7 +1100,7 @@ END;
           $this->message("Container already exists", 'warning');
         } 
         else if ( $e->getResponse()->getStatusCode() == '404' ) {
-          if ($action==='create') {
+          if ($this->$action==='create') {
             $this->message("Cannot find container $this->id (or image $this->cont_image)", 'warning');
           } else {
             $this->message("Cannot find container $this->id", 'warning');

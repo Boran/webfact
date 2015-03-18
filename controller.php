@@ -515,9 +515,7 @@ END;
 
   protected function getGit() {
     // todo: improve the command, or make it a setting?
-    #$cmd = "cd /var/www/html && if [ -d '.git' ] ; then git log -n 1 --date=short --abbrev-commit --pretty=oneline; fi";
-    #$cmd = "cd /var/www/html && if [ -d '.git' ] ; then git log -n 1 --date=short --abbrev-commit --pretty=medium; fi";
-    $cmd = "cd /var/www/html && if [ -x 'webfact_status.sh' ] ; then ./webfact_status.sh; fi";
+    $cmd = "if [ -d /var/www/html ] && cd /var/www/html && if [ -x 'webfact_status.sh' ] ; then ./webfact_status.sh; fi";
     #$cmd = "cd /var/www/html && ls";
     $this->actual_git = $this->runCommand($cmd);
   }

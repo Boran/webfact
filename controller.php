@@ -569,8 +569,8 @@ END;
       $this->actual_restart= $cont['HostConfig']['RestartPolicy']['Name'];
     }
     $this->actual_error='none';
-    if (isset($cont['State']['Error'])) {
-      $this->actual_error= $cont['State']['Error'] . '.';
+    if (isset($cont['State']['Error']) && !empty($cont['State']['Error'])) {
+      $this->actual_error= $cont['State']['Error'];
     }
     return $runstatus;
   }

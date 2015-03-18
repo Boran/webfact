@@ -1521,14 +1521,14 @@ END;
             $data = $imagemgr->inspect($image);
             #dpm($data);
             $imagename = $image->__toString();
-            $this->message("Deleting $imagename", status, 3);
+            $this->message("Deleting $imagename", 'status', 3);
             watchdog('webfact', "deleting $imagename");
             try {
               $imagemgr->remove($image);
             } catch (Exception $e) {   // ignore 409s, seems to work anyway
               if ($e->getResponse()->getStatusCode() == 409) {
                 ; // ignore conflicts
-                dpm($e->getResponse());
+                #dpm($e->getResponse());
               } else {
                 throw($e);
               }

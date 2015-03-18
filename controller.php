@@ -31,11 +31,10 @@ class WebfactController {
   public function __construct() {
     global $user;
     $account = $user;
-    $this->user= $account->name;
+    #watchdog('webfact', 'WebfactController __construct()');
     $this->markup = '';
     $this->verbose = 1;
     $this->category = 'none';
-    #watchdog('webfact', 'WebfactController __construct()');
     $this->docker_ports = array();
     $this->fqdn = '';
 
@@ -51,6 +50,12 @@ class WebfactController {
     $this->msglevel1 = variable_get('webfact_msglevel1', TRUE);  // normal infos
     $this->msglevel2 = variable_get('webfact_msglevel2', TRUE);  // more
     $this->msglevel3 = variable_get('webfact_msglevel3', TRUE);  // debug
+
+    if (isset($account->name)) {
+      $this->user= $account->name;
+    } else {
+      $this->user= 'anonymous';
+    }
 
     /*$log = new Logger('name');
       $log->pushHandler(new StreamHandler('/tmp/mono.log', Logger::WARNING));
@@ -156,8 +161,9 @@ class WebfactController {
                   <li><a href="$wpath/start/$this->nid">Start</a></li>
                   <li><a href="$wpath/restart/$this->nid">Restart</a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/delete/$this->nid" onclick="return confirm('Are you sure?')">Delete</a></li>
                   <li><a href="$wpath/create/$this->nid">Create</a></li>
+                  <li class="divider"></li>
+                  <li><a href="$wpath/delete/$this->nid" onclick="return confirm('Are you sure?')">Delete</a></li>
                 </ul>
               </li>
             </ul> 
@@ -169,7 +175,7 @@ class WebfactController {
                   <li><a href="$wpath/backup/$this->nid">Backup container now</a></li>	
 		  <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
 		  <li class="divider"></li>
-                  <li><a href="$wpath/backuplistdelete/$this->nid" onclick="return confirm('Sure?')">Remove ALL backups of $this->id</a></li>
+                  <li><a href="$wpath/backuplistdelete/$this->nid" onclick="return confirm('This will take some time to delete all backups. Continue?')">Remove ALL backup images of $this->id</a></li>
 		  <li class="divider"></li>
                   <li><a href="$wpath/coexport/$this->nid" onclick="return confirm('Download this container to a tarfile? This will be slow as hundreds of MB are typical. ')">Download container</a></li>	  
                 </ul>
@@ -501,7 +507,7 @@ END;
     #dpm($response->__toString());
     if ($body = $response->getBody()) {
       $body->seek(0);
-      $result = $body->read(4096); // get first 4k
+      $result = $body->read(4096); // get first 4k, todo: parameter?
     }
     #dpm($result);
     return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
@@ -964,8 +970,10 @@ END;
         );
         $savedimage = $this->docker->commit($container, $config);
         $this->message("saved to " . $savedimage->__toString(), 'status', 3);
-        $this->message("stop ", 'status', 3);
-        $manager->stop($container);
+        if ($this->getStatus($this->nid) == 'running' ) {
+          $this->message("stop ", 'status', 3);
+          $manager->stop($container);
+        }
         $this->message("remove ", 'status', 3);
         $manager->remove($container);
         $this->message("rebuilding: saved to " . $savedimage->__toString() .", stopped+deleted.", 'status', 2);
@@ -985,7 +993,7 @@ END;
         #dpm($config);
         $container= new Docker\Container($config);
         $container->setName($this->id);
-        $this->message("create ", 'status', 3);
+        $this->message("create $this->id from $this->cont_image", 'status', 3);
         $manager->create($container);
         $this->message("start ", 'status', 3);
         #dpm($this->startconfig);
@@ -1092,7 +1100,11 @@ END;
           $this->message("Container already exists", 'warning');
         } 
         else if ( $e->getResponse()->getStatusCode() == '404' ) {
-          $this->message("Cannot find container ". $this->id, 'warning');
+          if ($action==='create') {
+            $this->message("Cannot find container $this->id (or image $this->cont_image)", 'warning');
+          } else {
+            $this->message("Cannot find container $this->id", 'warning');
+          }
         }  // todo: add for each use case
 
         if (isset($container)) {
@@ -1492,28 +1504,40 @@ END;
         $this->markup .= '</div>';
         break;
 
-      case 'backuplistdelete':  // list images of current container
-        $this->client->setDefaultOption('timeout', 120);
-        // todo: cache the image list for speed
+      case 'backuplistdelete':  // delete images of current container
+        $this->client->setDefaultOption('timeout', 180);
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
         }
         $imagemgr = $this->getImageManager();
-        $images = $imagemgr->findAll();
         $this->markup .= '<div class="container-fluid">';
-        $this->markup .= "<h3>Delete all backup images of $this->id</h3>";
+        $this->markup .= "<h3>Delete backup images of $this->id</h3>";
+        $this->message("Finding images ..", 'status', 3);
+        $images = $imagemgr->findAll();
         $imagenid = $this->nid;
         foreach ($images as $image) {
-          if (! strcmp($this->id, $image->getRepository())) {
+          if (! strcmp($this->id, $image->getRepository())) {  // look for names
             $data = $imagemgr->inspect($image);
+            #dpm($data);
             $imagename = $image->__toString();
-            $this->message("Deleting $imagename");
-            $imagemgr->remove($image);
+            $this->message("Deleting $imagename", status, 3);
+            watchdog('webfact', "deleting $imagename");
+            try {
+              $imagemgr->remove($image);
+            } catch (Exception $e) {   // ignore 409s, seems to work anyway
+              if ($e->getResponse()->getStatusCode() == 409) {
+                ; // ignore conflicts
+                dpm($e->getResponse());
+              } else {
+                throw($e);
+              }
+            }
+            $this->markup .= "<p>deleted $imagename</p>";
           }
         }
         $this->message("Deleting done");
-        $this->markup .= '</div>';
+        $this->markup .= '<p>Deleting done</p></div>';
         break;
 
 
@@ -1779,8 +1803,8 @@ END;
     } catch (Exception $e) {
       if ($e->hasResponse()) {
         $this->message($e->getResponse()->getReasonPhrase() .
-          " (error code " . $e->getResponse()->getStatusCode(). " in arguments() )" , 'warning');
-        $this->message($e->getResponse()->__toString(), 'warning', 3);
+          " (error code " . $e->getResponse()->getStatusCode(). " for action=$action in arguments())" , 'warning');
+        $this->message("Response details: " . $e->getResponse()->__toString(), 'warning', 3);
       }
       else {
         $this->message($e->getMessage(), 'error');
@@ -1912,8 +1936,9 @@ END;
       }
 
       $description.= '<div class="clearfix"></div><h4>Run time:</h4>';
-      $uptime = $this->runCommand('uptime');
-      $description.= "<div class=col-xs-2><abbr title='Result of the uptime command run within the container'>Uptime</abbr>:</div> <div class=col-xs-10>$uptime</div>";
+      // 18.3.15/SB: uptime disabled since it refers to docker host, not container
+      //$uptime = $this->runCommand('uptime');
+      //$description.= "<div class=col-xs-2><abbr title='Result of the uptime command run within the container'>Uptime</abbr>:</div> <div class=col-xs-10>$uptime</div>";
       $this->getGit();    // grab git status
       #if (strlen($this->actual_git)>0) {
         $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-10>$this->actual_git</div>";

@@ -518,8 +518,8 @@ END;
   }
 
   protected function getGit() {
-    // todo: improve the command, or make it a setting?
-    $cmd = "if [ -d /var/www/html ] && cd /var/www/html && if [ -x 'webfact_status.sh' ] ; then ./webfact_status.sh; fi";
+    // todo: make it configurable
+    $cmd = "if [[ -d /var/www/html ]] && [[ -x /var/www/html/webfact_status.sh ]] ; then /var/www/html/webfact_status.sh; fi;";
     #$cmd = "cd /var/www/html && ls";
     $this->actual_git = $this->runCommand($cmd);
   }
@@ -884,7 +884,7 @@ END;
 
       else if ($this->action=='coappupdate') {
         global $base_root;
-        $this->client->setDefaultOption('timeout', 60);   // backups can take time
+        $this->client->setDefaultOption('timeout', 120);   // backups can take time
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, website update not allowed.", 'error');
@@ -896,17 +896,20 @@ END;
           return;
         }
         // backup, stop, delete:
-        watchdog('webfact', "coappupdate - backup, update", WATCHDOG_NOTICE);
+        watchdog('webfact', "coappupdate $this->id - backup", WATCHDOG_NOTICE);
         $config = array('tag' => date('Ymd') . '-before-update', 'repo' => $this->id, 'author' => $this->user,
           'comment' => "saved before app update on $base_root",
         );
         $savedimage = $this->docker->commit($container, $config);
         $this->message("Saved to " . $savedimage->__toString(), 'status', 3);
         $this->message("Run webfact_update.sh (see results below)", 'status', 2);
-        $logs = $this->runCommand("cd /var/www/html && ./webfact_update.sh");
-        $this->markup = "<h3>Update results</h3><pre>$logs</pre>";   // show output
-        $this->message("stop ", 'status', 3);
-        $manager->stop($container);
+        watchdog('webfact', "coappupdate $this->id - run webfact_update.sh, log to /tmp/webfact_update.log", WATCHDOG_NOTICE);
+        #$cmd='ps';
+        $cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact_update.log "; // todo: parameter
+        $logs = $this->runCommand($cmd);
+        $this->markup = "<h3>Update results</h3><p>Running '${cmd}':</p><pre>$logs</pre><p>See also /tmp/webfact_update.log</p>";   // show output
+        $this->message("restart $this->id", 'status', 3);
+        $manager->restart($container);
         return;
       }
 

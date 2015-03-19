@@ -135,6 +135,9 @@ class WebfactController {
    * bootstrap navigation on the website/advanced page
    */ 
   private function nav_menu($wpath, $des) {
+    if (! isset($this->website) ) {
+      return;
+    }
     $rebuild_src_msg = "Backup, stop, delete and recreate " . $this->website->title .". Data in the container will be lost! Are you sure?";
     $rebuild_meta_msg = "Backup, stop, delete and recreate from that same backup. i.e. to rebuild after changing an environment setting. Are you sure?";
 
@@ -230,10 +233,10 @@ END;
                   <li><a href="$wpath/impull/$this->nid" onclick="return confirm('Pulling the base image from Dockerhub will affect all future builds using that image. Are you sure you sure?')">Pull latest image</a></li>
                   <li><a href="$wpath/changes/$this->nid">Container fs changes</a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/proxyrestart/0$this->des" onclick="return confirm('Restarting nginx will break all sessions, refresh the page manually after a few secs. ')">Restart nginx</a></li>
-                  <li><a href="$wpath/proxy2restart/0$this->des">Restart nginx-gen</a></li>
-                  <li><a href="$wpath/proxylogs/0$this->des">Logs nginx</a></li>
-                  <li><a href="$wpath/proxy2logs/0$this->des">Logs nginx-gen</a></li>
+                  <li><a href="$wpath/proxyrestart/$this->nid$this->des" onclick="return confirm('Restarting nginx will break all sessions, refresh the page manually after a few secs. ')">Restart nginx</a></li>
+                  <li><a href="$wpath/proxy2restart/$this->nid$this->des">Restart nginx-gen</a></li>
+                  <li><a href="$wpath/proxylogs/$this->nid$this->des">Logs nginx</a></li>
+                  <li><a href="$wpath/proxy2logs/$this->nid$this->des">Logs nginx-gen</a></li>
                 </ul>
               </li>
             </ul> 

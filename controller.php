@@ -882,12 +882,13 @@ END;
         global $base_root;
         $this->client->setDefaultOption('timeout', 60);   // backups can take time
         // Stop accidental deleting of key containers
-        #if (stristr($this->category, 'production')) {
-        #  $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
-        #  return;
-        #}
+        if (stristr($this->category, 'production')) {
+          $this->message("$this->id is categorised as production, website update not allowed.", 'error');
+          return;
+        }
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
+          drupal_goto("/website/advanced/$this->nid"); // go back to status page
           return;
         }
         // backup, stop, delete:
@@ -916,6 +917,7 @@ END;
         }
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
+          drupal_goto("/website/advanced/$this->nid"); // go back to status page
           return;
         }
         // backup, stop, delete:

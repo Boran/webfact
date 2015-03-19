@@ -168,19 +168,6 @@ class WebfactController {
               </li>
             </ul> 
 
-            <ul class="nav navbar-nav">
-              <li class="dropdown">
-                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Backup/restore<span class="caret"></span></a>
-                <ul class="dropdown-menu" role="menu">
-                  <li><a href="$wpath/backup/$this->nid">Backup container now</a></li>	
-		  <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
-		  <li class="divider"></li>
-                  <li><a href="$wpath/backuplistdelete/$this->nid" onclick="return confirm('This will take some time to delete all backups. Continue?')">Remove ALL backup images of $this->id</a></li>
-		  <li class="divider"></li>
-                  <li><a href="$wpath/coexport/$this->nid" onclick="return confirm('Download this container to a tarfile? This will be slow as hundreds of MB are typical. ')">Download container</a></li>	  
-                </ul>
-              </li>
-            </ul> 
 
             <ul class="nav navbar-nav">
               <li class="dropdown">
@@ -199,6 +186,20 @@ class WebfactController {
                   <li class="divider"></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
       <!--        <li><a href="$wpath/couploadfile/$this->nid">File Upload</a></li>	  -->
+                </ul>
+              </li>
+            </ul> 
+
+            <ul class="nav navbar-nav">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Backup/restore<span class="caret"></span></a>
+                <ul class="dropdown-menu" role="menu">
+                  <li><a href="$wpath/backup/$this->nid">Backup container now</a></li>	
+		  <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
+		  <li class="divider"></li>
+                  <li><a href="$wpath/backuplistdelete/$this->nid" onclick="return confirm('This will take some time to delete all backups. Continue?')">Remove ALL backup images of $this->id</a></li>
+		  <li class="divider"></li>
+                  <li><a href="$wpath/coexport/$this->nid" onclick="return confirm('Download this container to a tarfile? This will be slow as hundreds of MB are typical. ')">Download container</a></li>	  
                 </ul>
               </li>
             </ul> 

@@ -468,6 +468,11 @@ END;
     }
     sort($this->docker_env);
 
+    if (!empty($this->website->field_docker_restartpolicy['und'][0]) ) {
+      $this->restartpolicy= $this->website->field_docker_restartpolicy['und'][0]['value'];
+    }
+    #dpm($this->restartpolicy);
+
     #dpm($this->docker_start_vol);
     if (empty($this->docker_start_vol)) {  // API will not accept an empty Binds
       $this->startconfig = [
@@ -481,6 +486,7 @@ END;
         'PortBindings'  => $this->docker_ports,
       ];
     }
+
     #dpm($this->docker_ports);
     #dpm($this->startconfig);
     #dpm($this->docker_vol);

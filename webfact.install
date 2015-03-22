@@ -1,0 +1,42 @@
+<?php
+
+/**
+* Implements hook_install().
+*/
+function webfact_install() {
+
+  $new_vocab = (object) array(
+      'name' => 'category',
+      'description' => 'This vocabulary defines the websites status',
+      'machine_name' => 'category',
+    );
+
+  taxonomy_vocabulary_save($new_vocab);
+
+  $vocab = taxonomy_vocabulary_machine_name_load('category');
+
+  $term1 = (object) array(
+     'name' => 'test',
+     'description' => 'This is the category for test websites',
+     'vid' => $vocab->vid,
+  );
+
+  taxonomy_term_save($term1);
+
+  $term2 = (object) array(
+     'name' => 'production',
+     'description' => 'This is the category for production websites',
+     'vid' => $vocab->vid,
+  );
+
+  taxonomy_term_save($term2);
+
+}
+
+/**
+* Implements hook_uninstall().
+*/
+function webfact_uninstall() {
+  $vocab = taxonomy_vocabulary_machine_name_load('category');
+  taxonomy_vocabulary_delete($vocab->vid);
+}

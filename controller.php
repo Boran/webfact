@@ -1579,7 +1579,7 @@ END;
 <!-- Bootstrap: -->
 <form >
   <legend>Run a command inside the container</legend>
-  <textarea id="textinput-0" name="cmd" type="text" placeholder="" class="form-control" rows="3"></textarea>
+  <textarea id="textinput-0" name="cmd" type="text" placeholder="" class="form-control" rows="3" style="font-family:monospace; background-color: black; color: white;"></textarea>
   <p class="help-block">e.g. A non-blocking command such as: /bin/date or 'cd /var/www/html; ls' or 'tail 100 /var/log/apache2/*error*log' or 'cd /var/www/html; drush watchdog-show'</p>
   <button id="submit" name="submit" class="btn btn-primary btn-lg">
     <span class="glyphicon glyphicon-play-circle" aria-hidden="true"></span>

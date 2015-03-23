@@ -909,9 +909,9 @@ END;
         $savedimage = $this->docker->commit($container, $config);
         $this->message("Saved to " . $savedimage->__toString(), 'status', 3);
         $this->message("Run webfact_update.sh (see results below)", 'status', 2);
-        watchdog('webfact', "coappupdate $this->id - run webfact_update.sh, log to /tmp/webfact_update.log", WATCHDOG_NOTICE);
+        watchdog('webfact', "coappupdate $this->id - run webfact_update.sh, log to /tmp/webfact.log", WATCHDOG_NOTICE);
         #$cmd='ps';
-        $cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact_update.log "; // todo: parameter
+        $cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact.log "; // todo: parameter
         $logs = $this->runCommand($cmd);
         $this->markup = "<h3>Update results</h3><p>Running '${cmd}':</p><pre>$logs</pre><p>See also /tmp/webfact_update.log</p>";   // show output
         $this->message("restart $this->id", 'status', 3);

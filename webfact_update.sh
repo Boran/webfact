@@ -7,6 +7,7 @@
 #
 # This example updated /var/www/html and all webfact modules from git.
 
+echo "___________ `date '+%Y-%m-%d %H:%M'` _________________";
 echo "Running webfact_update.sh: updating elements of a Webfactory UI";
 cd /var/www/html
 if [ -d '.git' ] ; then
@@ -39,5 +40,5 @@ echo " "
 echo "-- Drush update, clear caches"
 drush updatedb
 drush cache-clear all
-echo "-- webfact_update.sh done --"
+echo "-- `date '+%Y-%m-%d %H:%M'` webfact_update.sh done --"
 

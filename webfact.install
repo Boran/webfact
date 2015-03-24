@@ -4,33 +4,58 @@
 * Implements hook_install().
 */
 function webfact_install() {
-
   $new_vocab = (object) array(
-      'name' => 'category',
+      'name' => 'Category',
       'description' => 'This vocabulary defines the websites status',
       'machine_name' => 'category',
     );
-
   taxonomy_vocabulary_save($new_vocab);
-
   $vocab = taxonomy_vocabulary_machine_name_load('category');
-
   $term1 = (object) array(
-     'name' => 'test',
+     'name' => 'Test',
      'description' => 'This is the category for test websites',
      'vid' => $vocab->vid,
   );
-
   taxonomy_term_save($term1);
-
   $term2 = (object) array(
-     'name' => 'production',
+     'name' => 'Production',
      'description' => 'This is the category for production websites',
      'vid' => $vocab->vid,
   );
-
   taxonomy_term_save($term2);
-
+  $field = array(
+    'field_name' => 'field_category',
+    'type' => 'taxonomy_term_reference',
+    'settings' => array(
+      'allowed_values' => array(
+        array(
+          'vocabulary' => 'category',
+          'parent' => 0
+        ),
+      ),
+    ),
+  );
+  field_create_field($field);
+  $instance = array(
+      'field_name' => 'field_category',
+      'entity_type' => 'node',
+      'label' => 'Category',
+      'bundle' => 'website',
+      'required' => true,
+      'widget' => array(
+          'type' => 'options_select'
+      ),
+      'display' => array(
+          'default' => array('type' => 'hidden'),
+          'teaser' => array('type' => 'hidden')
+      ),
+      'default_value' => array(
+        array(
+          'tid' => 1
+        )
+      )
+  );
+  field_create_instance($instance);
 }
 
 /**

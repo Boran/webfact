@@ -28,9 +28,14 @@ class WebfactController {
   protected $actual_restart, $actual_error, $actual_git;
 
 
-  public function __construct() {
-    global $user;
-    $account = $user;
+  public function __construct($user_id_override = FALSE) {
+    //allow the controller user to be set on creation - needed for api calls
+    if($user_id_override){
+      $account = user_load($user_id_override);
+    }else{
+      global $user;
+      $account = $user;
+    }
     #watchdog('webfact', 'WebfactController __construct()');
     $this->markup = '';
     $this->verbose = 1;

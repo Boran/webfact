@@ -133,7 +133,7 @@ class WebfactController {
 
   /*
    * bootstrap navigation on the website/advanced page
-   */ 
+   */
   private function nav_menu($wpath, $des) {
     if (! isset($this->website) ) {
       return;
@@ -169,14 +169,14 @@ class WebfactController {
                   <li><a href="$wpath/delete/$this->nid" onclick="return confirm('Are you sure?')">Delete</a></li>
                 </ul>
               </li>
-            </ul> 
+            </ul>
 
 
             <ul class="nav navbar-nav">
               <li class="dropdown">
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Advanced<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
-                  <li><a href="$wpath/inspect/$this->nid">Inspect</a></li>	
+                  <li><a href="$wpath/inspect/$this->nid">Inspect</a></li>
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
@@ -188,24 +188,24 @@ class WebfactController {
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
-      <!--        <li><a href="$wpath/couploadfile/$this->nid">File Upload</a></li>	  -->
+      <!--        <li><a href="$wpath/couploadfile/$this->nid">File Upload</a></li>   -->
                 </ul>
               </li>
-            </ul> 
+            </ul>
 
             <ul class="nav navbar-nav">
               <li class="dropdown">
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Backup/restore<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
-                  <li><a href="$wpath/backup/$this->nid">Backup container now</a></li>	
-		  <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
-		  <li class="divider"></li>
+                  <li><a href="$wpath/backup/$this->nid">Backup container now</a></li>
+      <li><a href="$wpath/backuplist/$this->nid">List backups </a></li>
+      <li class="divider"></li>
                   <li><a href="$wpath/backuplistdelete/$this->nid" onclick="return confirm('This will take some time to delete all backups. Continue?')">Remove ALL backup images of $this->id</a></li>
-		  <li class="divider"></li>
-                  <li><a href="$wpath/coexport/$this->nid" onclick="return confirm('Download this container to a tarfile? This will be slow as hundreds of MB are typical. ')">Download container</a></li>	  
+      <li class="divider"></li>
+                  <li><a href="$wpath/coexport/$this->nid" onclick="return confirm('Download this container to a tarfile? This will be slow as hundreds of MB are typical. ')">Download container</a></li>
                 </ul>
               </li>
-            </ul> 
+            </ul>
 END;
 
     ## Admin menu
@@ -214,8 +214,8 @@ END;
       $tlink='';
       if (isset($this->website->field_template['und'][0]['target_id'])) {
         $tid=$this->website->field_template['und'][0]['target_id'];
-        if (isset($tid)) { 
-          $tlink="<li><a href=/node/$tid/edit$des>Edit template</a></li> "; 
+        if (isset($tid)) {
+          $tlink="<li><a href=/node/$tid/edit$des>Edit template</a></li> ";
         }
       }
       $nav2 = <<<END
@@ -239,7 +239,7 @@ END;
                   <li><a href="$wpath/proxy2logs/$this->nid$this->des">Logs nginx-gen</a></li>
                 </ul>
               </li>
-            </ul> 
+            </ul>
 END;
       } else {
         $nav2='';
@@ -258,7 +258,7 @@ END;
    * no checking on permissions,
    * todo: this is an experimental abstraction, initially used in hook_node_delete()
    */
-  public function deleteContainer($name) {  
+  public function deleteContainer($name) {
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
 
@@ -310,7 +310,7 @@ END;
   }
 
 
-  /* 
+  /*
    * load the meta spec for a container from the website and template
    * todo: what is $this-> is not loaded?
    */
@@ -399,10 +399,10 @@ END;
           }   // ports
 
         }
-      }   
+      }
     } // if $template
 
-    // 
+    //
     // website settings: (override templates)
     //
     // get category:
@@ -456,7 +456,7 @@ END;
           #dpm($matches);
           if (isset($matches[1])) {
             // 'PortBindings' => [ '80/tcp' => [ [ 'HostPort' => '2000' ] ] ],
-            $this->docker_ports[ "$matches[1]/tcp" ] = 
+            $this->docker_ports[ "$matches[1]/tcp" ] =
               [[ 'HostIp' => '0.0.0.0', 'HostPort' => "$matches[2]" ]] ;
           }
           else {
@@ -499,7 +499,7 @@ END;
    * run a commind inside the conatiner and give back the results
    */
   protected function runCommand($cmd) {
-    // todo: 
+    // todo:
     // - check status code and do a watchdog or interactive error?
 
     $manager = $this->getContainerManager();
@@ -603,7 +603,7 @@ END;
   protected function imageAction($verbose=1) {
     //watchdog('webfact', "imageAction() $this->action");
     try {
-      $manager = $this->docker->getImageManager(); 
+      $manager = $this->docker->getImageManager();
 
       if ($this->action=='images') {
         #$imagemgt = $this->docker->getImageManager();   // todo
@@ -648,7 +648,7 @@ END;
   protected function contAction($verbose=1) {
     //watchdog('webfact', "contAction() $this->action");
     try {
-      $manager = $this->docker->getContainerManager(); 
+      $manager = $this->docker->getContainerManager();
       $container = $manager->find($this->id);
 
       if ($this->action=='delete') {
@@ -809,11 +809,11 @@ END;
         }
         return;
       }
- 
+
       else if ($this->action=='start') {
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
-        } 
+        }
         else if ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
           $this->message("$this->id already started", 'warning');
         }
@@ -849,7 +849,7 @@ END;
           #dpm($datavol);
           return;
         } else {
-          $datavolmap = $datavol[$datavolsrc]; 
+          $datavolmap = $datavol[$datavolsrc];
           if (strlen($datavolmap)<1) {
             $this->message("The container does not have a $datavolsrc volume mapped to a server directory.", 'error');
             #dpm($datavolmap);
@@ -978,7 +978,7 @@ END;
           $this->message("$this->id does not exist", 'warning');
           return;
         }
-        // backup, stop, delete: 
+        // backup, stop, delete:
         watchdog('webfact', "rebuild - backup, stop, delete, create from sources", WATCHDOG_NOTICE);
         $config = array('tag' => date('Ymd') . '-rebuild', 'repo' => $this->id, 'author' => $this->user,
           'comment' => "saved before source rebuild on $base_root",
@@ -1014,7 +1014,7 @@ END;
         #dpm($this->startconfig);
         $manager->start($container, $this->startconfig);
 
-        $msg= "$this->action $this->id: title=" . $this->website->title 
+        $msg= "$this->action $this->id: title=" . $this->website->title
           . ", docker image=$this->cont_image" ;
         watchdog('webfact', $msg);
 
@@ -1032,7 +1032,7 @@ END;
       else if ($this->action=='kill') {
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
-        } 
+        }
         else if ($container->getRuntimeInformations()['State']['Running'] == FALSE) {
           $this->message("$this->id already stopped", 'warning');
         }
@@ -1047,7 +1047,7 @@ END;
       else if ($this->action=='restart') {
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
-        } 
+        }
         else {
           $this->message("$this->action $this->id");
           $manager->restart($container);
@@ -1059,10 +1059,10 @@ END;
       else if ($this->action=='stop') {
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
-        } 
+        }
         else if ($container->getRuntimeInformations()['State']['Running'] == FALSE) {
           $this->message("$this->id already stopped", 'warning');
-        } 
+        }
         else {
           $this->message("$this->action $this->id");
           $manager->stop($container);
@@ -1113,7 +1113,7 @@ END;
         // user friendly error messages
         if ( ($this->action=='create') && ($e->getResponse()->getStatusCode() == '409') ) {
           $this->message("Container already exists", 'warning');
-        } 
+        }
         else if ( $e->getResponse()->getStatusCode() == '404' ) {
           if ($this->$action==='create') {
             $this->message("Cannot find container $this->id (or image $this->cont_image)", 'warning');
@@ -1176,7 +1176,7 @@ END;
     $part2 = '';
 
     try {
-      $manager = $this->docker->getContainerManager(); 
+      $manager = $this->docker->getContainerManager();
 
       // container operations must have a node and container
       switch ($action) {
@@ -1254,7 +1254,7 @@ END;
           $this->message("Permission denied, $this->user is not admin", 'error');
           break;
         }
-      case 'images':  
+      case 'images':
       case 'version':
         $result=$this->imageAction();
         if ($verbose==0) {
@@ -1275,7 +1275,7 @@ END;
           $this->message("Permission denied, $this->user is not admin", 'error');
           break;
         }
-      case 'inspect':  
+      case 'inspect':
         // todo: should only be for the owner but views needs to be able to query the status
         // todo   $this->client->setDefaultOption('timeout', 100);
         $result=$this->contAction();
@@ -1309,7 +1309,7 @@ END;
         if (isset($_GET['destination'])) {  // go back where we were
           #dpm(request_uri());
           $from = drupal_parse_url($_GET['destination']);
-          drupal_goto($from['path']);  
+          drupal_goto($from['path']);
         }
         break;
 
@@ -1327,7 +1327,7 @@ END;
       case 'proxyrestart':
         // The reverse proxy  had an issue
         //$this->id=$this->rproxy;
-        if ($action == 'proxy2restart') { 
+        if ($action == 'proxy2restart') {
           $this->id = 'nginx-gen' ;
         } else {
           $this->id = 'nginx';
@@ -1408,7 +1408,7 @@ END;
             $this->message("$this->id is categorised as production, delete+restore not allowed.", 'warning');
             return;
           }
-          
+
           // change image configured for this node
           $this->cont_image = $thismage->__toString();
           $this->website->field_docker_image['und'][0]['value'] = $this->cont_image;
@@ -1459,7 +1459,7 @@ END;
             #print_r($matches);
             $imrepo=$matches[1];
             $imtag=$matches[2];
-          } else { 
+          } else {
             $imrepo=$str;
             $imtag='latest';  // presume there is no tag
           }
@@ -1572,33 +1572,20 @@ END;
         break;
 
 
-      case 'cocmd':  
+      case 'cocmd':
         $this->client->setDefaultOption('timeout', 30);
         $this->markup = '<div class="container-fluid">';
         $html = <<<END
 <!-- Bootstrap: -->
 <form >
-<fieldset>
-<legend>Run a command inside the container</legend>
-<!-- Button -->
-<div class="col-xs-2">
-  <div class="control-group">
-    <div class="controls">
-      <button id="submit" name="submit" class="btn btn-default">Execute</button>
-    </div>
-  </div>
-</div>
-<!-- Text input-->
-<div class="col-xs-10">
-  <div class="control-group">
-    <div class="controls">
-      <input id="textinput-0" name="cmd" type="text" placeholder="" class="input-xxlarge">
-      <p class="help-block">e.g. A non-blocking command such as: /bin/date or 'cd /var/www/html; ls' or 'tail 100 /var/log/apache2/*error*log' or 'cd /var/www/html; drush watchdog-show'</p>
-    </div>
-  </div>
-</div>
-
-</fieldset>
+  <legend>Run a command inside the container</legend>
+  <textarea id="textinput-0" name="cmd" type="text" placeholder="" class="form-control" rows="3" style="font-family:monospace; background-color: black; color: white;"></textarea>
+  <p class="help-block">e.g. A non-blocking command such as: /bin/date or 'cd /var/www/html; ls' or 'tail 100 /var/log/apache2/*error*log' or 'cd /var/www/html; drush watchdog-show'</p>
+  <button id="submit" name="submit" class="btn btn-primary btn-lg">
+    <span class="glyphicon glyphicon-play-circle" aria-hidden="true"></span>
+    Run
+  </button>
+  <hr>
 </form>
 END;
         $this->markup .= $html;
@@ -1666,7 +1653,7 @@ END;
         if(isset($_POST["submit"])) {
           #dpm($_FILES);
           $target_dir = "/tmp/couploadfile/";
-          if (!is_dir($target_dir)) { mkdir($target_dir); } 
+          if (!is_dir($target_dir)) { mkdir($target_dir); }
           $target_file = $target_dir . basename($_FILES["fileToUpload"]["name"]);
             // todo: first check file type, size?
             if (move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) {
@@ -1789,7 +1776,7 @@ END;
         ini_set('zlib.output_compression', false);
         ini_set('implicit_flush', true);
         ob_implicit_flush(true);
-        echo "<div style=\"display:none\"></div>";                    
+        echo "<div style=\"display:none\"></div>";
         #$a = 1/0;
 
         echo "<pre>";

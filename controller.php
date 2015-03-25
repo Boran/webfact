@@ -28,9 +28,14 @@ class WebfactController {
   protected $actual_restart, $actual_error, $actual_git;
 
 
-  public function __construct() {
-    global $user;
-    $account = $user;
+  public function __construct($user_id_override = FALSE) {
+    //allow the controller user to be set on creation - needed for api calls
+    if($user_id_override){
+      $account = user_load($user_id_override);
+    }else{
+      global $user;
+      $account = $user;
+    }
     #watchdog('webfact', 'WebfactController __construct()');
     $this->markup = '';
     $this->verbose = 1;
@@ -1305,7 +1310,7 @@ END;
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
         }
-        $result=$this->contAction();
+        $result=$this->contAction($verbose);
         if (isset($_GET['destination'])) {  // go back where we were
           #dpm(request_uri());
           $from = drupal_parse_url($_GET['destination']);

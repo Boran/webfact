@@ -542,7 +542,7 @@ END;
     $this->actual_status = $this->runCommand($cmd);
 
     // get the build status number created by start.sh in the boran/drupal image, if available
-    $cmd = "if [[ -f var/log/start.sh.log ]] ; then tail /var/log/start.sh.log; fi";
+    $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
     $this->actual_buildstatus = $this->runCommand($cmd);
   }
 
@@ -1071,7 +1071,7 @@ END;
           // inform user:
           $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
           $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
-          $this->message("Provisioning: you can connect to the new site at $newtime. Slect logs to follow progress in real time", 'status');
+          $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
           drupal_goto("/website/advanced/$this->nid"); // show new status
           #drupal_goto("/website/logs/$this->nid"); // show new status
         }
@@ -1164,7 +1164,7 @@ END;
           $this->message("Container already exists", 'warning');
         }
         else if ( $e->getResponse()->getStatusCode() == '404' ) {
-          if ($this->$action==='create') {
+          if ($this->action==='create') {
             $this->message("Cannot find container $this->id (or image $this->cont_image)", 'warning');
           } else {
             $this->message("Cannot find container $this->id", 'warning');
@@ -1927,10 +1927,10 @@ END;
       //$description.= "<div class=col-xs-2><abbr title='Result of the uptime command run within the container'>Uptime</abbr>:</div> <div class=col-xs-10>$uptime</div>";
       $this->getContainerStatus();    // grab git status
       #if (strlen($this->actual_status)>0) {
-        $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-6>$this->actual_status</div>";
+        $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-4>$this->actual_status</div>";
 
       if (strlen($this->actual_buildstatus)>0) {
-        $description.= "<div class=col-xs-2><abbr title='Build status 0-99 from a Drupal website. 99 means 100% sucess.'>Initial build</abbr>:</div> <div class=col-xs-2>$this->actual_buildstatus</div>";
+        $description.= "<div class=col-xs-2><abbr title='Build status 0-99 from a Drupal website. 99 means 100% sucess.'>Initial build</abbr>:</div> <div class=col-xs-4>$this->actual_buildstatus</div>";
       } else {
         $description.= "<div class=col-xs-4>.</div>";
       }

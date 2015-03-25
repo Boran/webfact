@@ -171,7 +171,8 @@ class WebfactController {
                   <li class="divider"></li>
                   <li><a href="$wpath/create/$this->nid">Create</a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/delete/$this->nid" onclick="return confirm('Are you sure?')">Delete</a></li>
+                  <li><a href="$wpath/delete/$this->nid" onclick="return confirm('Are you sure?')">Delete container</a></li>
+                  <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Are you sure?')">Delete container+meta data</a></li>
                 </ul>
               </li>
             </ul>
@@ -266,15 +267,21 @@ END;
   public function deleteContainer($name) {
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
-
+     if (!$container) {
+       watchdog('webfact', "deleteContainer $name - no such container");
+       return;
+     }
      // todo: use nid, not name, and check if in production?
      #   if (stristr($this->category, 'production')) {
      #     $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
      #     return;
      #   }
-     $manager->stop($container);
+
+     if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+       $manager->stop($container);
+     }
      $manager->remove($container);
-     watchdog('webfact', "deleteContainer $name");
+     watchdog('webfact', "deleteContainer $name - removed");
   }
 
 
@@ -651,18 +658,35 @@ END;
 
 
   protected function contAction($verbose=1) {
-    //watchdog('webfact', "contAction() $this->action");
+    watchdog('webfact', "contAction() $this->action");
     try {
       $manager = $this->docker->getContainerManager();
       $container = $manager->find($this->id);
 
-      if ($this->action=='delete') {
+
+      // delete meta data and container
+      if ($this->action=='deleteall') {
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
+        if (! $container) {
+          $this->message("$this->id does not exist",  'error');
+          return;
+        }
+        watchdog('webfact', 'deleteall node id ' . $this->nid);
+        node_delete($this->nid);   // this will trigger deleteContainer() too
+        $this->message("Meta data and container deleted");
+        drupal_goto('/websites');
+      }
 
+      else if ($this->action=='delete') {
+        // Stop accidental deleting of key containers
+        if (stristr($this->category, 'production')) {
+          $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
+          return;
+        }
         if (! $container) {
           $this->message("$this->id does not exist",  'error');
         }
@@ -1209,6 +1233,7 @@ END;
         case 'stop':
         case 'start':
         case 'delete':
+        case 'deleteall':
         case 'create':
         case 'restart':
         case 'pause':
@@ -1335,6 +1360,7 @@ END;
         break;
 
       case 'logs':
+      case 'deleteall':
       case 'processes':
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');

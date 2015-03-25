@@ -222,12 +222,34 @@ function webfact_node_delete($node) {
     //dpm($node);
     $w = new WebfactController;
     $w->deleteContainer($node->title); 
-    drupal_set_message("Note: backup images of $node->title have not been deleted, these are removed automatically during weekly cleanup.");
+    drupal_set_message("Note: backup images of $node->title have NOT been deleted (should be removed automatically later)");
     // todo: if there is a destination back to /something/nid, delete it
     //if (isset($_GET['destination'])) {  // go back where we were
     //  $from = drupal_parse_url($_GET['destination']);
     //}
   }
+}
+
+
+function webfact_form_alter (&$form, &$form_state, $form_id) {
+  if ($form_id == 'website_node_form') {
+    $form['#validate'][] = 'webfact_form_validate';
+    #dpm($form['#validate']);
+  }
+}
+/*
+ * hostname: strip spaces, force lowercase
+ */
+function webfact_form_validate($form, &$form_state) {
+  // todo: how to active this code only for new nodes?
+  if (isset($form_state['values']['field_hostname']['und'][0]['value'])) {
+    $form_state['values']['field_hostname']['und'][0]['value'] 
+      = preg_replace('/\s+/', '', 
+         strtolower($form_state['values']['field_hostname']['und'][0]['value']));
+    // todo: only allow a-Z0-9 and dash?
+    // then set form_set_error('title', t('Invalid hostname.'));
+  }
+  #dpm($form_state['values']);
 }
 
 

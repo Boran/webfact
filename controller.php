@@ -979,7 +979,12 @@ END;
 
       else if ($this->action=='rebuild') {
         global $base_root;
-        $this->client->setDefaultOption('timeout', 30);
+        $this->client->setDefaultOption('timeout', 60);
+        $meta_refresh = array(
+          '#type' => 'html_tag', '#tag' => 'meta',
+          '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
+        drupal_add_html_head($meta_refresh, 'meta_refresh');
+
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
@@ -1006,7 +1011,7 @@ END;
 
         $this->action='create';
         $this->contAction();
-        $this->message("Click on 'logs' to track progress", 'status', 2);
+        #$this->message("Click on 'logs' to track progress", 'status', 2);
         return;
       }
 
@@ -1030,12 +1035,17 @@ END;
         watchdog('webfact', $msg);
 
         if ($verbose == 1) {
+        $meta_refresh = array(
+          '#type' => 'html_tag', '#tag' => 'meta',
+          '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
+        drupal_add_html_head($meta_refresh, 'meta_refresh');
           $this->message($msg, 'status', 2);
           // inform user:
           $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
           $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
-          $this->message("Provisioning: you can connect to the new site at $newtime.", 'status');
+          $this->message("Provisioning: you can connect to the new site at $newtime. Slect logs to follow progress in real time", 'status');
           drupal_goto("/website/advanced/$this->nid"); // show new status
+          #drupal_goto("/website/logs/$this->nid"); // show new status
         }
         return;
       }
@@ -1379,7 +1389,7 @@ END;
 
 
       case 'advanced':  // just drop through to menu below
-       $meta_refresh = array(
+        $meta_refresh = array(
          '#type' => 'html_tag', '#tag' => 'meta',
          '#attributes' => array( 'content' =>  '30', 'http-equiv' => 'refresh',));
         drupal_add_html_head($meta_refresh, 'meta_refresh');

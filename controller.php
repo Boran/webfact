@@ -508,7 +508,7 @@ END;
 
 
   /*
-   * run a commind inside the conatiner and give back the results
+   * run a command inside the conatiner and give back the results
    */
   protected function runCommand($cmd) {
     // todo:
@@ -535,15 +535,19 @@ END;
     return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
   }
 
+  protected function getContainerBuildStatus() {
+    // get the build status number created by start.sh in the boran/drupal image, if available
+    $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
+    $this->actual_buildstatus = $this->runCommand($cmd);
+    return($this->actual_buildstatus);
+  }
+
   protected function getContainerStatus() {
     // todo: make it configurable
     $cmd = "if [[ -d /var/www/html ]] && [[ -x /var/www/html/webfact_status.sh ]] ; then /var/www/html/webfact_status.sh; fi;";
     #$cmd = "cd /var/www/html && ls";
     $this->actual_status = $this->runCommand($cmd);
-
-    // get the build status number created by start.sh in the boran/drupal image, if available
-    $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
-    $this->actual_buildstatus = $this->runCommand($cmd);
+    return($this->actual_status);
   }
 
 
@@ -1926,6 +1930,7 @@ END;
       //$uptime = $this->runCommand('uptime');
       //$description.= "<div class=col-xs-2><abbr title='Result of the uptime command run within the container'>Uptime</abbr>:</div> <div class=col-xs-10>$uptime</div>";
       $this->getContainerStatus();    // grab git status
+      $this->getContainerBuildStatus();  
       #if (strlen($this->actual_status)>0) {
         $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-4>$this->actual_status</div>";
 

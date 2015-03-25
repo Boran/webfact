@@ -238,18 +238,19 @@ function webfact_form_alter (&$form, &$form_state, $form_id) {
   }
 }
 /*
- * hostname: strip spaces, force lowercase
+ * hostname: force lowercase, strip evering except a-z/0-9
  */
 function webfact_form_validate($form, &$form_state) {
   // todo: how to active this code only for new nodes?
   if (isset($form_state['values']['field_hostname']['und'][0]['value'])) {
     $form_state['values']['field_hostname']['und'][0]['value'] 
-      = preg_replace('/\s+/', '', 
+      #= preg_replace('/\s+/', '', 
+      = preg_replace('/[^A-Za-z0-9-]/', '', 
          strtolower($form_state['values']['field_hostname']['und'][0]['value']));
-    // todo: only allow a-Z0-9 and dash?
+    // Could also warn user:
     // then set form_set_error('title', t('Invalid hostname.'));
   }
-  #dpm($form_state['values']);
+  //dpm($form_state['values']['field_hostname']);
 }
 
 

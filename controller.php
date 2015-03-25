@@ -658,7 +658,7 @@ END;
 
 
   protected function contAction($verbose=1) {
-    watchdog('webfact', "contAction() $this->action");
+    #watchdog('webfact', "contAction() $this->action");
     try {
       $manager = $this->docker->getContainerManager();
       $container = $manager->find($this->id);

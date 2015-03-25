@@ -1632,10 +1632,10 @@ END;
 
 
       case 'cocmd':
-        $meta_refresh = array(
-          '#type' => 'html_tag', '#tag' => 'meta',
-          '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
-        drupal_add_html_head($meta_refresh, 'meta_refresh');
+        #$meta_refresh = array(
+        #  '#type' => 'html_tag', '#tag' => 'meta',
+        #  '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
+        #drupal_add_html_head($meta_refresh, 'meta_refresh');
 
         $this->client->setDefaultOption('timeout', 30);
         $this->markup = '<div class="container-fluid">';

@@ -803,6 +803,12 @@ END;
           $this->message("$this->id does not exist", 'warning');
         }
         else {
+          // refresh every 5 secs
+          $meta_refresh = array(
+            '#type' => 'html_tag', '#tag' => 'meta',
+            '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
+          drupal_add_html_head($meta_refresh, 'meta_refresh');
+
           //                               $follow $stdout $stderr $timestamp $tail = "all"
           $logs=$manager->logs($container, false, true, true, false, $this->loglines);
           //$logs=$manager->logs($container, true, true, true, false, $this->loglines);
@@ -1373,6 +1379,10 @@ END;
 
 
       case 'advanced':  // just drop through to menu below
+       $meta_refresh = array(
+         '#type' => 'html_tag', '#tag' => 'meta',
+         '#attributes' => array( 'content' =>  '30', 'http-equiv' => 'refresh',));
+        drupal_add_html_head($meta_refresh, 'meta_refresh');
         break;
 
       case 'imres':     // restore an image to the current container
@@ -1578,6 +1588,11 @@ END;
 
 
       case 'cocmd':
+        $meta_refresh = array(
+          '#type' => 'html_tag', '#tag' => 'meta',
+          '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
+        drupal_add_html_head($meta_refresh, 'meta_refresh');
+
         $this->client->setDefaultOption('timeout', 30);
         $this->markup = '<div class="container-fluid">';
         $html = <<<END
@@ -1585,7 +1600,7 @@ END;
 <form >
   <legend>Run a command inside the container</legend>
   <textarea id="textinput-0" name="cmd" type="text" placeholder="" class="form-control" rows="3" style="font-family:monospace; background-color: black; color: white;"></textarea>
-  <p class="help-block">e.g. A non-blocking command such as: /bin/date or 'cd /var/www/html; ls' or 'tail 100 /var/log/apache2/*error*log' or 'cd /var/www/html; drush watchdog-show'</p>
+  <p class="help-block">e.g. A non-blocking command such as: /bin/date or 'cd /var/www/html; ls' or 'tail 100 /var/log/apache2/*error*log' or 'cd /var/www/html; drush watchdog-show'. This screen automatically refreshes every 5 seconds.</p>
   <button id="submit" name="submit" class="btn btn-primary btn-lg">
     <span class="glyphicon glyphicon-play-circle" aria-hidden="true"></span>
     Run

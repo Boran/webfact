@@ -1310,7 +1310,7 @@ END;
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
         }
-        $result=$this->contAction();
+        $result=$this->contAction($verbose);
         if (isset($_GET['destination'])) {  // go back where we were
           #dpm(request_uri());
           $from = drupal_parse_url($_GET['destination']);

@@ -25,7 +25,7 @@ class WebfactController {
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $dserver, $fserver, $loglines, $env_server; // settings
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
-  protected $actual_restart, $actual_error, $actual_git;
+  protected $actual_restart, $actual_error, $actual_status, $actual_buildstatus;
 
 
   public function __construct($user_id_override = FALSE) {
@@ -535,11 +535,15 @@ END;
     return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
   }
 
-  protected function getGit() {
+  protected function getContainerStatus() {
     // todo: make it configurable
     $cmd = "if [[ -d /var/www/html ]] && [[ -x /var/www/html/webfact_status.sh ]] ; then /var/www/html/webfact_status.sh; fi;";
     #$cmd = "cd /var/www/html && ls";
-    $this->actual_git = $this->runCommand($cmd);
+    $this->actual_status = $this->runCommand($cmd);
+
+    // get the build status number created by start.sh in the boran/drupal image, if available
+    $cmd = "if [[ -f var/log/start.sh.log ]] ; then tail /var/log/start.sh.log; fi";
+    $this->actual_buildstatus = $this->runCommand($cmd);
   }
 
 
@@ -1921,10 +1925,15 @@ END;
       // 18.3.15/SB: uptime disabled since it refers to docker host, not container
       //$uptime = $this->runCommand('uptime');
       //$description.= "<div class=col-xs-2><abbr title='Result of the uptime command run within the container'>Uptime</abbr>:</div> <div class=col-xs-10>$uptime</div>";
-      $this->getGit();    // grab git status
-      #if (strlen($this->actual_git)>0) {
-        $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-10>$this->actual_git</div>";
-      #}
+      $this->getContainerStatus();    // grab git status
+      #if (strlen($this->actual_status)>0) {
+        $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-6>$this->actual_status</div>";
+
+      if (strlen($this->actual_buildstatus)>0) {
+        $description.= "<div class=col-xs-2><abbr title='Build status 0-99 from a Drupal website. 99 means 100% sucess.'>Initial build</abbr>:</div> <div class=col-xs-2>$this->actual_buildstatus</div>";
+      } else {
+        $description.= "<div class=col-xs-4>.</div>";
+      }
       $description.= '</div></div>';
     }
     $description.= '<div class="clearfix"></div>';

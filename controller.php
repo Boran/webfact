@@ -535,14 +535,14 @@ END;
     return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
   }
 
-  protected function getContainerBuildStatus() {
+  public function getContainerBuildStatus() {
     // get the build status number created by start.sh in the boran/drupal image, if available
     $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
     $this->actual_buildstatus = $this->runCommand($cmd);
     return($this->actual_buildstatus);
   }
 
-  protected function getContainerStatus() {
+  public function getContainerStatus() {
     // todo: make it configurable
     $cmd = "if [[ -d /var/www/html ]] && [[ -x /var/www/html/webfact_status.sh ]] ; then /var/www/html/webfact_status.sh; fi;";
     #$cmd = "cd /var/www/html && ls";

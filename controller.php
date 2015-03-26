@@ -78,6 +78,7 @@ class WebfactController {
     $this->docker = new Docker\Docker($this->client);
   }
 
+
   public function getContainerManager() {
     return $this->docker->getContainerManager();
   }
@@ -92,11 +93,11 @@ class WebfactController {
 
 
   /*
-   * helper function. hack drupal file_transer(9 to set caching headers
+   * helper function. hack drupal file_transer() to set caching headers
    * and not call drupal exit.
    * https://api.drupal.org/api/drupal/includes%21file.inc/function/file_transfer/7
    */
-  private function tar_file_transfer($uri, $filename) {
+  public function tar_file_transfer($uri, $filename) {
     if (ob_get_level()) {
       ob_end_clean();
     }
@@ -261,7 +262,7 @@ END;
 
   /*
    * stop or delete a container by name
-   * no checking on permissions,
+   * no checking of permissions,
    * todo: this is an experimental abstraction, initially used in hook_node_delete()
    */
   public function deleteContainer($name) {
@@ -286,7 +287,7 @@ END;
 
 
   /*
-   * create a container: test fucntion, really abstract this bit out?
+   * create a container: test function, really abstract this bit out?
    * implementation does not smell good!
    */
   public function create($verbose = 0) {   // create a container
@@ -324,9 +325,9 @@ END;
 
   /*
    * load the meta spec for a container from the website and template
-   * todo: what is $this-> is not loaded?
+   * todo: what if $this->id is not loaded?
    */
-  private function load_meta() {
+  public function load_meta() {
     $this->docker_start_vol=array();
     $this->docker_vol=array();
     $this->docker_env=array();
@@ -535,22 +536,29 @@ END;
     return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
   }
 
+  /*
+   * get the build status number created by start.sh in the boran/drupal image, if available
+   */
   public function getContainerBuildStatus() {
-    // get the build status number created by start.sh in the boran/drupal image, if available
     $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
     $this->actual_buildstatus = $this->runCommand($cmd);
     return($this->actual_buildstatus);
   }
 
+  /*
+   * get the status withing the container, from webfact_status.sh
+   */
   public function getContainerStatus() {
-    // todo: make it configurable
+    // todo: make the command a parameter
     $cmd = "if [[ -d /var/www/html ]] && [[ -x /var/www/html/webfact_status.sh ]] ; then /var/www/html/webfact_status.sh; fi;";
     #$cmd = "cd /var/www/html && ls";
     $this->actual_status = $this->runCommand($cmd);
     return($this->actual_status);
   }
 
-
+  /*
+   * query the docker status on the conatiner
+   */
   public function getStatus($nid) {
     $runstatus = 'n/a';
     if (! is_numeric($nid) ) {
@@ -1935,7 +1943,7 @@ END;
         $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-4>$this->actual_status</div>";
 
       if (strlen($this->actual_buildstatus)>0) {
-        $description.= "<div class=col-xs-2><abbr title='Build status 0-99 from a Drupal website. 99 means 100% sucess.'>Initial build</abbr>:</div> <div class=col-xs-4>$this->actual_buildstatus</div>";
+        $description.= "<div class=col-xs-2><abbr title='Build status 0-99 from a Drupal website. 99 means 100% success.'>Initial build</abbr>:</div> <div class=col-xs-4>$this->actual_buildstatus</div>";
       } else {
         $description.= "<div class=col-xs-4>.</div>";
       }

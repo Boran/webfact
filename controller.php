@@ -72,8 +72,6 @@ class WebfactController {
 
     // define docker connection params
     $this->client = new Docker\Http\DockerClient(array(), $this->dserver);
-    #$this->client = new Docker\Http\DockerClient(array(), 'tcp://195.176.209.22:2375');
-    # 'unix:///var/run/docker.sock'
     $this->client->setDefaultOption('timeout', 30);     // default should be a parameter?
     $this->docker = new Docker\Docker($this->client);
   }
@@ -1943,7 +1941,7 @@ END;
         $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-4>$this->actual_status</div>";
 
       if (strlen($this->actual_buildstatus)>0) {
-        $description.= "<div class=col-xs-2><abbr title='Build status 0-99 from a Drupal website. 99 means 100% success.'>Initial build</abbr>:</div> <div class=col-xs-4>$this->actual_buildstatus</div>";
+        $description.= "<div class=col-xs-2><abbr title='Build completion % for a Drupal website.'>Initial build</abbr>:</div> <div class=col-xs-4>$this->actual_buildstatus</div>";
       } else {
         $description.= "<div class=col-xs-4>.</div>";
       }

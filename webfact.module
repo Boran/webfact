@@ -90,6 +90,10 @@ function webfact_menu() {
   return $items;
 }
 
+/* 
+ test: https://webfactx.webfact.vptt.ch/ajax-test/72
+ todo: cannot get jwuery stuff to run
+ */
 function ajax_link_page($path, $nid) {
   return array(
     '#type' => 'link',

@@ -11,6 +11,7 @@ core = "7.x"
 
 files[] = controller.php
 stylesheets[all][] = css/webfact.css
+scripts[] = ajax_link.js
 
 # for libraries such as guzzle
 dependencies[] = composer_manager

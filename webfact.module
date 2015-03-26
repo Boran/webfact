@@ -71,9 +71,69 @@ function webfact_menu() {
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK, // no menu
   );
+
+  $items['ajax-test/%'] = array(
+    'title' => 'Ajax Test',
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'ajax_link_page',
+    'page arguments'   => array(0, 1, 2),
+    'access arguments' => array('access content'),
+  );
+  $items['my-ajax-test/%'] = array(
+    'title' => 'Ajax test callback',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'ajax_link_callback',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('access content'),
+  );
+
   return $items;
 }
 
+function ajax_link_page($path, $nid) {
+  return array(
+    '#type' => 'link',
+    '#title' => t("Ajax Link for: $nid"),
+    '#href' => 'my-ajax-test/nojs/'.$nid,
+    '#prefix' => '<div id="ajax-link">',
+    '#suffix' => '</div><div id="ajax-display"></div>',
+    '#ajax' => array(
+      'effect' => 'fade',
+    ),
+  );
+}
+/**
+ * Ajax callback to display the current time.
+ */
+function ajax_link_callback($ajax, $nid) {
+  // Do any database queries, processing, etc.
+  $time = t('The current time is: !time', array('!time' => date('Y-m-d H:i:s')));
+  $w= new WebfactController(false, $nid);
+  $time = "Nid=$nid Build status=" . $w->getContainerBuildStatus(). ', ' . $time;
+ 
+  if ($ajax == 'ajax') {
+    $commands = array();
+    // Ajax command to replace the #ajax-display element with the current time.
+    $commands[] = ajax_command_replace('#ajax-display', "<div id='ajax-display'>" . $time . "</div>");
+    // Add a visual "changed" marker to the '#ajax-display' element.
+    $commands[] = ajax_command_changed('#ajax-display');
+    // Trigger our ajax_link jQuery plugin.
+    #$commands[] = ajax_command_invoke('#ajax-display', "ajax_link");
+    $commands[] = ajax_command_invoke(NULL, "myJavascriptFunction", array('foo'=>'bar'));
+    #$commands[] = array('command' =>"myJavascriptFunction");
+
+    // Menu 'page callback' and #ajax['callback'] functions are supposed to
+    // return render arrays. If returning an Ajax commands array, it must be
+    // encapsulated in a render array structure.
+    ajax_deliver(array('#type' => 'ajax', '#commands' => $commands));
+  }
+  else {
+    // No ajax, just display the time on a page using renderable array.
+    return array(
+      '#markup' => 'Not clicked yet: ' . $time,
+    );
+  }
+}
 
 // admin form
 function webfact_admin_settings() {

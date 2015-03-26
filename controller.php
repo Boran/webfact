@@ -884,7 +884,6 @@ END;
       }
 
 
-/*
       else if ($this->action=='coosupdate') {
         global $base_root;
         $this->client->setDefaultOption('timeout', 60);   // backups can take time
@@ -939,9 +938,13 @@ END;
         $this->create();    // new container from meta data
 
         $logs .= "<br>, stopping, renaming";
-        $this->markup = "<h3>Update results</h3>Run /root/backup.sh && ls -altr /data :<pre>$logs</pre>";   // show output
+        $logs .= "<br> build %= " . $this->getContainerBuildStatus();
+// XX: need some ajax here too
+        // show output
+        $this->markup = "<h3>Update results</h3>Run /root/backup.sh && ls -altr /data :<pre>$logs</pre>";
         return;
       }
+/*
 */
 
 
@@ -1081,15 +1084,17 @@ END;
         watchdog('webfact', $msg);
 
         if ($verbose == 1) {
-        $meta_refresh = array(
-          '#type' => 'html_tag', '#tag' => 'meta',
-          '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
-        drupal_add_html_head($meta_refresh, 'meta_refresh');
           $this->message($msg, 'status', 2);
           // inform user:
           $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
           $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
           $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
+
+          // XX: do some ajax to query the build status and confirm when done
+          #$this->message("Build=" .$this->getContainerBuildStatus());
+          #if ($this->getContainerBuildStatus() == 100) {
+          #  $this->message("Build finished");
+          #}
           drupal_goto("/website/advanced/$this->nid"); // show new status
           #drupal_goto("/website/logs/$this->nid"); // show new status
         }
@@ -1646,11 +1651,6 @@ END;
 
 
       case 'cocmd':
-        #$meta_refresh = array(
-        #  '#type' => 'html_tag', '#tag' => 'meta',
-        #  '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
-        #drupal_add_html_head($meta_refresh, 'meta_refresh');
-
         $this->client->setDefaultOption('timeout', 30);
         $this->markup = '<div class="container-fluid">';
         $html = <<<END

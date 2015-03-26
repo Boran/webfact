@@ -28,7 +28,7 @@ class WebfactController {
   protected $actual_restart, $actual_error, $actual_status, $actual_buildstatus;
 
 
-  public function __construct($user_id_override = FALSE) {
+  public function __construct($user_id_override = FALSE, $nid=0) {
     //allow the controller user to be set on creation - needed for api calls
     if($user_id_override){
       $account = user_load($user_id_override);
@@ -74,6 +74,14 @@ class WebfactController {
     $this->client = new Docker\Http\DockerClient(array(), $this->dserver);
     $this->client->setDefaultOption('timeout', 30);     // default should be a parameter?
     $this->docker = new Docker\Docker($this->client);
+
+    // api call: load minimal website infos: node, container name
+    if ($nid>0) { 
+      $this->website=node_load($nid);
+      if ($this->website!=null) {
+        $this->id=$this->website->field_hostname['und'][0]['safe_value'];
+      }
+    }
   }
 
 

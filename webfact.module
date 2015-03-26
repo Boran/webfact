@@ -52,7 +52,7 @@ function webfact_menu() {
     'type' => MENU_NORMAL_ITEM,
   );  
 
-  // bootstrap tests
+  // entityfieldquery tests
   $items['bob'] = array(   
     'page callback'    => 'webfact_bootstrap',
     'access arguments' => array('access websites'),
@@ -180,6 +180,9 @@ function webfact_angular() {
   return theme('webfacts');
 }
 
+/* (deprecated) example to build a list of nodes with EntityFieldQuery() 
+ * and show in bootstrap. see bootstrap.tpl.php and 
+ */
 function webfact_bootstrap($path='x', $action='y', $id=0) {
   //dpm('webfact_bootstrap');
   //drupal_set_message($action);

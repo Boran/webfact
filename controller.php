@@ -524,8 +524,10 @@ END;
     $manager = $this->getContainerManager();
     $container = $manager->find($this->id);
     if ((strlen($cmd)<1) || ($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
+      watchdog('webfact', 'runCommand: invalid cmd/container or not running. cmd=' . $cmd);
       return;  // container not running, abort
     }
+    #watchdog('webfact', 'runCommand: ' . $cmd);
 
     $this->message("Running command: $cmd", 'status', 4);
     $execid = $manager->exec($container, ['/bin/bash', '-c', $cmd]);

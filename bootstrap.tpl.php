@@ -1,5 +1,7 @@
 <?php
 
+/* example to build a list of nodes with EntityFieldQuery() and show in bootstrap */
+
 
   $query = new EntityFieldQuery();
     $query

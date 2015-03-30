@@ -1949,7 +1949,7 @@ END;
     $description ='';
 
     // prepare colour status
-    $statushtml='<div class=website-status>';
+    $statushtml='<div id=website-status>';
     if ( ($runstatus == 'running') || ($runstatus == 'stopped') ) {
       $statushtml .= "<div class=$runstatus>$runstatus</div>";
     }

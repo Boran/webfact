@@ -3,10 +3,10 @@
   width: 200px;
 }
 
-.website-status .running {
+.running {
   color: green;
 }
-.website-status .stopped {
+#website-status .stopped {
   color: grey;
 }
 

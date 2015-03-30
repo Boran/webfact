@@ -1445,9 +1445,9 @@ END;
 
 
       case 'advanced':  // just drop through to menu below
-        $meta_refresh = array(
+        $meta_refresh = array(    // refresh status every minute
          '#type' => 'html_tag', '#tag' => 'meta',
-         '#attributes' => array( 'content' =>  '30', 'http-equiv' => 'refresh',));
+         '#attributes' => array( 'content' =>  '60', 'http-equiv' => 'refresh',));
         drupal_add_html_head($meta_refresh, 'meta_refresh');
         break;
 

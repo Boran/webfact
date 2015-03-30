@@ -695,13 +695,14 @@ END;
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
-        if (! $container) {
-          $this->message("$this->id does not exist",  'error');
-          return;
-        }
+        # even if there is no container, allow node to be wiped
+        #if (! $container) {
+        #  $this->message("$this->id does not exist",  'error');
+        #  return;
+        #}
         watchdog('webfact', 'deleteall node id ' . $this->nid);
         node_delete($this->nid);   // this will trigger deleteContainer() too
-        $this->message("Meta data and container deleted");
+        $this->message("Meta data and website deleted");
         drupal_goto('/websites');
       }
 

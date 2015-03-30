@@ -16,7 +16,7 @@ if [ -d '.git' ] ; then
     echo "-- backup: running /root/backup.sh /data"
   fi;
 
-  echo "-- git pull for /var/www"
+  echo "-- git pull for /var/www/html"
   git pull
   # todo: if credential are needed, somehow add them to /root/.netrc
 
@@ -34,6 +34,7 @@ echo "-- git pull for webfact components: module, theme, webfact_content_types, 
 (cd sites/all/modules/custom/webfact_content_types/ && git pull origin master)
 (cd sites/all/modules/custom/webfactapi && git pull origin master)
 
+echo "Note: if webfact_content_types changed, please re-apply the feature manually "
 
 # finally:
 echo " "

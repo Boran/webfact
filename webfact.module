@@ -233,18 +233,25 @@ function webfact_node_delete($node) {
   }
 }
 
-
+/*
+ * catch website or template edits
+ * todo: templates
+ */
 function webfact_form_alter (&$form, &$form_state, $form_id) {
-  if ($form_id == 'website_node_form') {
+  if (  ($form_id == 'website_node_form') 
+    || ($form_id == 'template_node_form') ) {
     $form['#validate'][] = 'webfact_form_validate';
     #dpm($form['#validate']);
   }
 }
 /*
- * hostname: force lowercase, strip evering except a-z/0-9
+ * validate fields: correct values
+ * todo: how to active this code only for new nodes?
  */
 function webfact_form_validate($form, &$form_state) {
-  // todo: how to active this code only for new nodes?
+  #dpm($form_state);
+
+  // hostname: force lowercase, strip everything except a-z/0-9
   if (isset($form_state['values']['field_hostname']['und'][0]['value'])) {
     $form_state['values']['field_hostname']['und'][0]['value'] 
       #= preg_replace('/\s+/', '', 
@@ -253,7 +260,46 @@ function webfact_form_validate($form, &$form_state) {
     // Could also warn user:
     // then set form_set_error('title', t('Invalid hostname.'));
   }
-  //dpm($form_state['values']['field_hostname']);
+  #dpm($form_state['values']['field_hostname']);
+
+  // strip double quotes (which break nginx-gen) and trim
+  if (isset($form_state['values']['field_docker_environment']['und'])) {
+    #dpm($form_state['values']['field_docker_environment']['und']);
+    foreach ($form_state['values']['field_docker_environment']['und'] as &$envline) {
+      if (isset($envline['value']) && (strlen($envline['value'])>0) ) {
+        $envline['value'] = trim($envline['value']);   // leading/trailing space
+        #dpm('old:' . $envline['value']);
+        $envline['value'] = preg_replace('/[\"]/', '', $envline['value']);
+        #dpm('new:' . $envline['value'] );
+      }
+    }
+  }
+
+  // remove leading/trailing space from fields with arrays
+  if (isset($form_state['values']['field_docker_volumes']['und'])) {
+    foreach ($form_state['values']['field_docker_volumes']['und'] as &$envline) {
+      if (isset($envline['value']) && (strlen($envline['value'])>0) ) {
+        $envline['value'] = trim($envline['value']);  
+      }
+    }
+  }
+  if (isset($form_state['values']['field_docker_ports']['und'])) {
+    foreach ($form_state['values']['field_docker_ports']['und'] as &$envline) {
+      if (isset($envline['value']) && (strlen($envline['value'])>0) ) {
+        $envline['value'] = trim($envline['value']);
+      }
+    }
+  }
+  // fields with just one value:
+  $fields=array('field_hostname', 'field_docker_image', 'field_site_email', 'field_hostname');
+  foreach ($fields as $field) {
+    if (isset($form_state['values'][$field]['und'][0]['value'])) {
+      $form_state['values'][$field]['und'][0]['value'] =
+        trim($form_state['values'][$field]['und'][0]['value']);
+      #dpm('trimmed ' . $field);
+    }
+  }
+
 }
 
 

@@ -565,7 +565,7 @@ END;
   }
 
   /*
-   * query the docker status on the conatiner
+   * query the docker status on the container
    */
   public function getStatus($nid) {
     $runstatus = 'n/a';
@@ -947,8 +947,6 @@ END;
         $this->markup = "<h3>Update results</h3>Run /root/backup.sh && ls -altr /data :<pre>$logs</pre>";
         return;
       }
-/*
-*/
 
 
       else if ($this->action=='coappupdate') {
@@ -1273,6 +1271,7 @@ END;
         case 'rebuildmeta':
         case 'coappupdate':
         case 'coosupdate':
+        case 'coget':
         case 'logs':
         case 'processes':
         case 'logtail':
@@ -1319,6 +1318,30 @@ END;
           #$container = $manager->find($this->id);
           break;
     }
+
+
+
+    /* 
+     * direct path that returns just data
+     * no menus.  see js/buildstatus.js
+     * todo: use json, or move to services?
+     * e.g. 
+     * {"status":"running","buildStatus":"200"}
+     */
+    if ($action=='coget') {
+      if ( ! user_access('manage containers')) {
+        $this->message("Permission denied, $this->user is not admin", 'error');
+        break; // drop through to menu
+      }
+      // $id has been loaded above already
+      #echo "<p id=getStatus>" . $this->getStatus($this->nid) .'</p>';
+      #echo "<p id=getContainerBuildStatus>" . $this->getContainerBuildStatus() .'</p>';
+      drupal_add_http_header('Content-Type', 'application/json');
+      echo json_encode(array('status'=>$this->getStatus($this->nid),
+        'buildStatus' => $this->getContainerBuildStatus() ));
+      return;
+    }
+
 
 
     // check permission, call action, handle feedback
@@ -1389,6 +1412,7 @@ END;
         }
         break;
 
+      #case 'coget':
       case 'logs':
       case 'deleteall':
       case 'processes':
@@ -1445,11 +1469,23 @@ END;
 
 
       case 'advanced':  // just drop through to menu below
-        $meta_refresh = array(    // refresh status every minute
-         '#type' => 'html_tag', '#tag' => 'meta',
-         '#attributes' => array( 'content' =>  '60', 'http-equiv' => 'refresh',));
-        drupal_add_html_head($meta_refresh, 'meta_refresh');
-        break;
+        // two ways of updating the status regularly
+        // a) browser refresh every XX secs
+          #$meta_refresh = array(    // refresh status every minute
+          # '#type' => 'html_tag', '#tag' => 'meta',
+          # '#attributes' => array( 'content' =>  '60', 'http-equiv' => 'refresh',));
+          #drupal_add_html_head($meta_refresh, 'meta_refresh');
+        // b) Setup polling via ajax
+        drupal_add_js(array('webfact' => array(
+          'webfact_site_check' => '1',
+          'webfact_nid'        => $this->website->nid,
+          'time_interval'      => 10000, // ms
+        )), 'setting');
+        $website_status = '<div class="loader"></div>' . t('Please wait...');
+        drupal_add_js(drupal_get_path('module', 'webfact') . '/js/buildstatus.js', 'file');
+
+        break;     // just through to menu below
+
 
       case 'imres':     // restore an image to the current container
       case 'imdel':     // delete a named image
@@ -1852,7 +1888,7 @@ END;
         #$response=$manager->attach($container, function ($output, $type) {print($output);} , true);
         #$response->getBody()->getContents();
         #$manager->attach($container, function($output, $type) {print($output);} , true)->getBody()->getContents();
-
+/*
         ini_set('output_buffering', 'off');
         ini_set('zlib.output_compression', false);
         ini_set('implicit_flush', true);
@@ -1864,6 +1900,7 @@ END;
         echo "---- todo: Realtime event:  ping -c 15 dock2 ------";
         system('ping -c 15 dock2');
         echo "</pre>";
+*/
 
         return;
 
@@ -1894,6 +1931,8 @@ END;
       }
     }
     #watchdog('webfact', "arguments $action, $this->id $this->nid $owner");
+
+
 
 
     // quick links to actions
@@ -1952,7 +1991,7 @@ END;
         $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-4>$this->actual_status</div>";
 
       if (strlen($this->actual_buildstatus)>0) {
-        $description.= "<div class=col-xs-2><abbr title='Build completion % for a Drupal website.'>Initial build</abbr>:</div> <div class=col-xs-4>$this->actual_buildstatus</div>";
+        $description.= "<div class=col-xs-2><abbr title='Build completion % for a Drupal website.'>Initial build</abbr>:</div> <div class=col-xs-4><div id=buildstatus>$this->actual_buildstatus</div> <div id=bs-postfix></div></div>";
       } else {
         $description.= "<div class=col-xs-4>.</div>";
       }

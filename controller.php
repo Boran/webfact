@@ -524,8 +524,10 @@ END;
     $manager = $this->getContainerManager();
     $container = $manager->find($this->id);
     if ((strlen($cmd)<1) || ($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
+      watchdog('webfact', 'runCommand: invalid cmd/container or not running. cmd=' . $cmd);
       return;  // container not running, abort
     }
+    #watchdog('webfact', 'runCommand: ' . $cmd);
 
     $this->message("Running command: $cmd", 'status', 4);
     $execid = $manager->exec($container, ['/bin/bash', '-c', $cmd]);
@@ -693,13 +695,14 @@ END;
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
-        if (! $container) {
-          $this->message("$this->id does not exist",  'error');
-          return;
-        }
+        # even if there is no container, allow node to be wiped
+        #if (! $container) {
+        #  $this->message("$this->id does not exist",  'error');
+        #  return;
+        #}
         watchdog('webfact', 'deleteall node id ' . $this->nid);
         node_delete($this->nid);   // this will trigger deleteContainer() too
-        $this->message("Meta data and container deleted");
+        $this->message("Meta data and website deleted");
         drupal_goto('/websites');
       }
 
@@ -1442,9 +1445,9 @@ END;
 
 
       case 'advanced':  // just drop through to menu below
-        $meta_refresh = array(
+        $meta_refresh = array(    // refresh status every minute
          '#type' => 'html_tag', '#tag' => 'meta',
-         '#attributes' => array( 'content' =>  '30', 'http-equiv' => 'refresh',));
+         '#attributes' => array( 'content' =>  '60', 'http-equiv' => 'refresh',));
         drupal_add_html_head($meta_refresh, 'meta_refresh');
         break;
 

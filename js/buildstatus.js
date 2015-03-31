@@ -1,5 +1,5 @@
 /*
- * Update tghe build status and docker status on /advanced,
+ * Update the build status and docker status on /advanced,
  * query status regularly from /website/coget/<nid>
  * see controller.php
  */
@@ -34,14 +34,10 @@
                 $('#buildstatus').text('(unfinished) ' +response.buildStatus);
               }
 
-              if (response.status == 'running') {
-                // why does this not apply the runing class correctly?
-                //$('#website-status').text('<div class="running">running</div>');
-                $('#website-status').text(response.status);  // update run status
-              }
-              else {
-                $('#website-status').text(response.status);  // update run status
-              }
+              // sttaus, setting div to rhuning/stopped etc for colouring
+              $('#website-status').html('<div class=' +response.status 
+                +'>' +response.status +'</div>');
+
               // reset timer?
               //clearInterval(refreshIntervalId);
               //setInterval(location.reload(), time_interval);

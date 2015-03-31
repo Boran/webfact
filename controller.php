@@ -17,51 +17,6 @@ use Docker\Exception\ImageNotFoundException;
 
 
 /*
- * batch prototype
- * https://api.drupal.org/api/drupal/includes%21form.inc/group/batch/7
- * https://www.drupal.org/node/180528
- */
-function batchSaveCont($nid, $title, &$context) {
-  $context['finished'] = 0;
-  $w= new WebfactController;
-  $w->arguments('backup', $nid, 0);  // verbose=0
-  $context['message'] = "saved image of $title";
-  $context['results'][] = 'saved';
-  $context['sandbox']['progress'] = 10;
-  $context['finished'] = 1;
-}
-function batchRemoveCont($nid, $title, &$context) {
-  $context['finished'] = 0;
-  $w= new WebfactController;
-  $w->arguments('delete', $nid, 0);  // verbose=0
-  $context['message'] = "delete $title";
-  $context['results'][] = 'deleted';
-  $context['sandbox']['progress'] = 20;
-  $context['finished'] = 1;
-}
-function batchCreateCont($nid, $title, &$context) {
-  $context['finished'] = 0;
-  $w= new WebfactController;
-  $w->arguments('create', $nid, 0);  // verbose=0
-  $context['message'] = "create $title";
-  $context['results'][] = 'create';
-  $context['sandbox']['progress'] = 30;
-  $context['finished'] = 1;
-}
-function batchRebuildDone($success, $results, $operations) {
-  if ($success) {
-    $message = t('Container created, installation is going on in the background. Follow the Build Status below to completion, or visit the logs page for details.');
-  }
-  else {
-    $message = t('Rebuild had issues.');
-  }
-  drupal_set_message($message);
-  // Provide data for the redirected page via $_SESSION.
-  $_SESSION['rebuild_batch_results'] = $results;
-}
-
-
-/*
  * encapsulate the Webfactory stuff into a calls, for easier Drupal7/8 porting
  */
 class WebfactController {
@@ -562,14 +517,18 @@ END;
   /*
    * run a command inside the conatiner and give back the results
    */
-  protected function runCommand($cmd) {
+  public function runCommand($cmd) {
     // todo:
     // - check status code and do a watchdog or interactive error?
 
     $manager = $this->getContainerManager();
     $container = $manager->find($this->id);
-    if ((strlen($cmd)<1) || ($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
-      watchdog('webfact', 'runCommand: invalid cmd/container or not running. cmd=' . $cmd);
+    if (strlen($cmd)<1) {
+      watchdog('webfact', 'runCommand: invalid cmd=' . $cmd);
+      return;  // container not running, abort
+    }
+    if (($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
+      watchdog('webfact', 'runCommand: container not running');
       return;  // container not running, abort
     }
     #watchdog('webfact', 'runCommand: ' . $cmd);
@@ -982,7 +941,7 @@ END;
         }
 
         // process
-        watchdog('webfact', "coappupdate - backup, update", WATCHDOG_NOTICE);
+        watchdog('webfact', "coosupdate - backup, update", WATCHDOG_NOTICE);
         $this->message("Run /root/backup.sh (see results below)", 'status', 2); // check result?
         $logs = $this->runCommand("/root/backup.sh && ls -altr /data");
         $this->message("Stop $this->id", 'status', 3);
@@ -1014,6 +973,21 @@ END;
           drupal_goto("/website/advanced/$this->nid"); // go back to status page
           return;
         }
+        // Update via batch API
+        $batch = array(
+          'title' => t('Run Website update'),
+          #'init_message' => t('Website update starting.'),
+          'operations' => array(
+            array('batchSaveCont',   array($this->website->nid, $this->id)),
+            array('batchUpdateCont', array($this->website->nid, $this->id)),
+          ),
+          'finished' => 'batchUpdateDone',
+          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+        );
+        batch_set($batch);
+        batch_process('website/advanced/' . $this->website->nid); // go here when done
+
+/*
         // backup, stop, delete:
         watchdog('webfact', "coappupdate $this->id - backup", WATCHDOG_NOTICE);
         $config = array('tag' => date('Ymd') . '-before-update', 'repo' => $this->id, 'author' => $this->user,
@@ -1029,6 +1003,7 @@ END;
         $this->markup = "<h3>Update results</h3><p>Running '${cmd}':</p><pre>$logs</pre><p>See also /tmp/webfact_update.log</p>";   // show output
         $this->message("restart $this->id", 'status', 3);
         $manager->restart($container);
+*/
         return;
       }
 
@@ -1103,7 +1078,7 @@ END;
             array('batchCreateCont', array($this->website->nid, $this->id)),
           ),
           'finished' => 'batchRebuildDone',
-          'file' => drupal_get_path('module', 'webfact') . '/controller.php',
+          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
         );
         batch_set($batch);
         batch_process('website/advanced/' . $this->website->nid); // go here when done
@@ -1752,7 +1727,7 @@ END;
 <!-- Bootstrap: -->
 <form >
   <legend>Run a command inside the container</legend>
-  <textarea id="textinput-0" name="cmd" type="text" placeholder="" class="form-control" rows="3" style="font-family:monospace; background-color: black; color: white;"></textarea>
+  <textarea id="runcommand" name="cmd" type="text" placeholder="" class="form-control" rows="3" style="font-family:monospace; background-color: black; color: white;"></textarea>
   <p class="help-block">e.g. A non-blocking command such as: /bin/date or 'cd /var/www/html; ls' or 'tail 100 /var/log/apache2/*error*log' or 'cd /var/www/html; drush watchdog-show'. This screen automatically refreshes every 5 seconds.</p>
   <button id="submit" name="submit" class="btn btn-primary btn-lg">
     <span class="glyphicon glyphicon-play-circle" aria-hidden="true"></span>
@@ -2074,18 +2049,20 @@ END;
     /* any batch result? If so display at the bottom
      * and empty the batch array.
      */
-    if (is_array($_SESSION['rebuild_batch_results'])) {
-      #dpm($_SESSION['rebuild_batch_results']);   
-      $rebuild_log='<h3>Rebuild log</h3><pre>';
-      foreach ($_SESSION['rebuild_batch_results'] as $line) {
-        $rebuild_log .= check_plain($line) .', '; // sanitise
+    if ( (isset($_SESSION['batch_results'])) 
+        && (is_array($_SESSION['batch_results'])) ) {
+      #dpm($_SESSION['batch_results']);   
+      $batchlog='<h3>Operation log</h3><div id=batchlog>';
+      foreach ($_SESSION['batch_results'] as $line) {
+        #$batchlog .= check_plain($line) .', '; // sanitise
+        $batchlog .= filter_xss($line) .'<br/> '; // sanitise
       }
-      $rebuild_log .= '</pre>';
+      $batchlog .= '</div>';
       $render_array['webfact_arguments'][2] = array(
         '#type'   => 'markup',
-        '#markup' => $rebuild_log,
+        '#markup' => $batchlog,
       );
-      unset($_SESSION['rebuild_batch_results']);
+      unset($_SESSION['batch_results']);
     }
 
 

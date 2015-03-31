@@ -10,6 +10,12 @@
   color: grey;
 }
 
+#batchlog {
+  font-family:monospace; 
+  background-color: black; 
+  color: white;
+  width: 80%;
+}
 .websites .button {
   cursor: pointer;
   padding: 4px 12px;

@@ -11,9 +11,10 @@
 #require_once '/var/www/html/sites/all/libraries/composer/autoload.php';
 # local composer: only way to load logging class, why?
 chdir(dirname(__DIR__));
-require_once 'vendor/autoload.php';
+#require_once 'vendor/autoload.php';
+require_once '/var/www/html/sites/all/libraries/composer/autoload.php';
 
-require '/var/www/html/sites/all/libraries/composer/stage1/docker-php/src/Docker/Manager/ContainerManager.php';
+#require '/var/www/html/sites/all/libraries/composer/stage1/docker-php/src/Docker/Manager/ContainerManager.php';
 
 /*
 #require_once "docker-php/src/Docker/Docker.php";
@@ -289,7 +290,6 @@ try {
  docker exec -i vanilla2 sh -c 'cat /tmp/dest.foo.txt'
         #$execid = $manager->exec($container, ["/bin/bash", "-c", "cat >/tmp/upload.file"]);
         #$result=$manager->execstart($execid);
-*/
 try {
   $resource="/tmp/foo.txt";
   $dest="/tmp/upload.file";
@@ -306,6 +306,7 @@ try {
   echo $e->getMessage();
 }
 
+*/
 
 
 
@@ -345,6 +346,16 @@ $exportStream = $manager->export($container);
   fclose($tarFile);
 echo "$tarFileName written\n";
 */
+
+
+/*
+ * rename a container
+ */
+#curl -X POST -H "Content-Type: application/json" http://127.0.0.1:2375/containers/vanilla2/rename?name=vanilla
+$lookfor='drupal8003';  $newname='drupal8003a';
+$container = $manager->find($lookfor);
+$ret = $manager->rename($container, $newname);
+
 
 
 ?>

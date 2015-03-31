@@ -983,7 +983,7 @@ END;
             array('batchSaveCont',   array($this->website->nid, $this->id)),
             array('batchUpdateCont', array($this->website->nid, $this->id)),
             # Do we really need to restart?
-            array('batchRestartCont',array($this->website->nid, $this->id)),
+            #array('batchRestartCont',array($this->website->nid, $this->id)),
           ),
           'finished' => 'batchUpdateDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',

@@ -17,6 +17,51 @@ use Docker\Exception\ImageNotFoundException;
 
 
 /*
+ * batch prototype
+ * https://api.drupal.org/api/drupal/includes%21form.inc/group/batch/7
+ * https://www.drupal.org/node/180528
+ */
+function batchSaveCont($nid, $title, &$context) {
+  $context['finished'] = 0;
+  $w= new WebfactController;
+  $w->arguments('backup', $nid, 0);  // verbose=0
+  $context['message'] = "saved image of $title";
+  $context['results'][] = 'saved';
+  $context['sandbox']['progress'] = 10;
+  $context['finished'] = 1;
+}
+function batchRemoveCont($nid, $title, &$context) {
+  $context['finished'] = 0;
+  $w= new WebfactController;
+  $w->arguments('delete', $nid, 0);  // verbose=0
+  $context['message'] = "delete $title";
+  $context['results'][] = 'deleted';
+  $context['sandbox']['progress'] = 20;
+  $context['finished'] = 1;
+}
+function batchCreateCont($nid, $title, &$context) {
+  $context['finished'] = 0;
+  $w= new WebfactController;
+  $w->arguments('create', $nid, 0);  // verbose=0
+  $context['message'] = "create $title";
+  $context['results'][] = 'create';
+  $context['sandbox']['progress'] = 30;
+  $context['finished'] = 1;
+}
+function batchRebuildDone($success, $results, $operations) {
+  if ($success) {
+    $message = t('Container created, installation is going on in the background. Follow the Build Status below to completion, or visit the logs page for details.');
+  }
+  else {
+    $message = t('Rebuild had issues.');
+  }
+  drupal_set_message($message);
+  // Provide data for the redirected page via $_SESSION.
+  $_SESSION['rebuild_batch_results'] = $results;
+}
+
+
+/*
  * encapsulate the Webfactory stuff into a calls, for easier Drupal7/8 porting
  */
 class WebfactController {
@@ -714,14 +759,21 @@ END;
         }
         if (! $container) {
           $this->message("$this->id does not exist",  'error');
+          return;
         }
         else if ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
-          $this->message("$this->id must be stopped first", 'warning');
+          if ($this->verbose===1) {
+            $this->message("$this->id must be stopped first", 'warning');
+            return;
+          } else {
+            $manager->stop($container);
+          }
         }
-        else {
+
+        watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
+        $manager->remove($container);
+        if ($this->verbose===1) {
           $this->message("$this->action $this->id");
-          $manager->remove($container);
-          watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
           drupal_goto("/website/advanced/$this->nid"); // show new status
         }
         return;
@@ -1030,45 +1082,31 @@ END;
       else if ($this->action=='rebuild') {
         global $base_root;
         $this->client->setDefaultOption('timeout', 60);
-        # use ajax, not refresh
-        drupal_add_js(array('webfact' => array(
-          'webfact_site_check' => '1',
-          'webfact_nid'        => $this->website->nid,
-          'time_interval'      => 10000, // ms
-        )), 'setting');
-        drupal_add_js(drupal_get_path('module', 'webfact') . '/js/buildstatus.js', 'file');
-        #$meta_refresh = array(
-        #  '#type' => 'html_tag', '#tag' => 'meta',
-        #  '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
-        #drupal_add_html_head($meta_refresh, 'meta_refresh');
-
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
           return;
         }
         if (! $container) {
-          $this->message("$this->id does not exist", 'warning');
+          $this->message("$this->id does not exist. Use Create rather then Rebuild.", 'warning');
           return;
         }
-        // backup, stop, delete:
-        watchdog('webfact', "rebuild - backup, stop, delete, create from sources", WATCHDOG_NOTICE);
-        $config = array('tag' => date('Ymd') . '-rebuild', 'repo' => $this->id, 'author' => $this->user,
-          'comment' => "saved before source rebuild on $base_root",
-        );
-        $savedimage = $this->docker->commit($container, $config);
-        $this->message("saved to " . $savedimage->__toString(), 'status', 4);
-        if ($this->getStatus($this->nid) == 'running' ) {
-          $this->message("stop ", 'status', 4);
-          $manager->stop($container);
-        }
-        $this->message("remove ", 'status', 4);
-        $manager->remove($container);
-        $this->message("rebuilding, first saved to " . $savedimage->__toString() .", stopped+deleted.", 'status', 2);
 
-        $this->action='create';
-        $this->contAction(0);
-        $this->message("Follow the Build Status below to completion, or the logs page to track in detail", 'status', 2);
+        // Rebuilding via batch API
+        watchdog('webfact', "rebuild batch- backup, stop, delete, create from sources", WATCHDOG_NOTICE);
+        $batch = array(
+          'title' => t('Rebuilding from sources'),
+          #'init_message' => t('Rebuild starting.'),
+          'operations' => array(
+            array('batchSaveCont', array($this->website->nid, $this->id)),
+            array('batchRemoveCont', array($this->website->nid, $this->id)),
+            array('batchCreateCont', array($this->website->nid, $this->id)),
+          ),
+          'finished' => 'batchRebuildDone',
+          'file' => drupal_get_path('module', 'webfact') . '/controller.php',
+        );
+        batch_set($batch);
+        batch_process('website/advanced/' . $this->website->nid); // go here when done
         return;
       }
 
@@ -1081,9 +1119,13 @@ END;
         #dpm($config);
         $container= new Docker\Container($config);
         $container->setName($this->id);
-        $this->message("create $this->id from $this->cont_image", 'status', 3);
+        if ($verbose == 1) {
+          $this->message("create $this->id from $this->cont_image", 'status', 3);
+        }
         $manager->create($container);
-        $this->message("start ", 'status', 3);
+        if ($verbose == 1) {
+          $this->message("start ", 'status', 3);
+        }
         #dpm($this->startconfig);
         $manager->start($container, $this->startconfig);
 
@@ -1688,11 +1730,18 @@ END;
           break;
         }
         $container = $manager->find($this->id);
-        $config = array('tag' => date('Ymd'), 'repo' => $this->id, 'author' => $this->user,
-          'comment' => "saved manually on $base_root ",
-        );
-        $savedimage = $this->docker->commit($container, $config);
-        $this->message("saved $this->id to image " . $savedimage->__toString() );
+        if ($container) {
+          $config = array('tag' => date('Ymd'), 'repo' => $this->id, 'author' => $this->user,
+            'comment' => "saved on $base_root ",);
+          $savedimage = $this->docker->commit($container, $config);
+          if ($this->verbose===1) {
+            $this->message("saved $this->id to image " . $savedimage->__toString() );
+          }
+        } else if ($this->verbose===1) {
+          $this->message("No container $this->id to backup" );
+        } else {
+          // fail silently
+        }
         break;
 
 
@@ -2022,6 +2071,24 @@ END;
       '#status' => $this->status,
     );
 */
+    /* any batch result? If so display at the bottom
+     * and empty the batch array.
+     */
+    if (is_array($_SESSION['rebuild_batch_results'])) {
+      #dpm($_SESSION['rebuild_batch_results']);   
+      $rebuild_log='<h3>Rebuild log</h3><pre>';
+      foreach ($_SESSION['rebuild_batch_results'] as $line) {
+        $rebuild_log .= check_plain($line) .', '; // sanitise
+      }
+      $rebuild_log .= '</pre>';
+      $render_array['webfact_arguments'][2] = array(
+        '#type'   => 'markup',
+        '#markup' => $rebuild_log,
+      );
+      unset($_SESSION['rebuild_batch_results']);
+    }
+
+
     if (!empty($this->markup) ) {
       $render_array['webfact_arguments'][3] = array(
         '#type' => 'markup',

@@ -1030,10 +1030,17 @@ END;
       else if ($this->action=='rebuild') {
         global $base_root;
         $this->client->setDefaultOption('timeout', 60);
-        $meta_refresh = array(
-          '#type' => 'html_tag', '#tag' => 'meta',
-          '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
-        drupal_add_html_head($meta_refresh, 'meta_refresh');
+        # use ajax, not refresh
+        drupal_add_js(array('webfact' => array(
+          'webfact_site_check' => '1',
+          'webfact_nid'        => $this->website->nid,
+          'time_interval'      => 10000, // ms
+        )), 'setting');
+        drupal_add_js(drupal_get_path('module', 'webfact') . '/js/buildstatus.js', 'file');
+        #$meta_refresh = array(
+        #  '#type' => 'html_tag', '#tag' => 'meta',
+        #  '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
+        #drupal_add_html_head($meta_refresh, 'meta_refresh');
 
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
@@ -1050,18 +1057,18 @@ END;
           'comment' => "saved before source rebuild on $base_root",
         );
         $savedimage = $this->docker->commit($container, $config);
-        $this->message("saved to " . $savedimage->__toString(), 'status', 3);
+        $this->message("saved to " . $savedimage->__toString(), 'status', 4);
         if ($this->getStatus($this->nid) == 'running' ) {
-          $this->message("stop ", 'status', 3);
+          $this->message("stop ", 'status', 4);
           $manager->stop($container);
         }
-        $this->message("remove ", 'status', 3);
+        $this->message("remove ", 'status', 4);
         $manager->remove($container);
-        $this->message("rebuilding: saved to " . $savedimage->__toString() .", stopped+deleted.", 'status', 2);
+        $this->message("rebuilding, first saved to " . $savedimage->__toString() .", stopped+deleted.", 'status', 2);
 
         $this->action='create';
-        $this->contAction();
-        #$this->message("Click on 'logs' to track progress", 'status', 2);
+        $this->contAction(0);
+        $this->message("Follow the Build Status below to completion, or the logs page to track in detail", 'status', 2);
         return;
       }
 
@@ -1991,7 +1998,7 @@ END;
         $description.= "<div class=col-xs-2><abbr title='If /var/www/html/webfact_status.sh exists it is run and the output is show here. It could be the last git commit for example.'>App status</abbr>:</div> <div class=col-xs-4>$this->actual_status</div>";
 
       if (strlen($this->actual_buildstatus)>0) {
-        $description.= "<div class=col-xs-2><abbr title='Build completion % for a Drupal website.'>Initial build</abbr>:</div> <div class=col-xs-4><div id=buildstatus>$this->actual_buildstatus</div> <div id=bs-postfix></div></div>";
+        $description.= "<div class=col-xs-2><abbr title='Build completion % for a Drupal website (may go to 200 where provisioning required).'>Build status</abbr>:</div> <div class=col-xs-4><div id=buildstatus>$this->actual_buildstatus</div> <div id=bs-postfix></div></div>";
       } else {
         $description.= "<div class=col-xs-4>.</div>";
       }
@@ -2025,28 +2032,6 @@ END;
     return $render_array;
   }
 }      // class
-
-/* see logtail above, todo: delete if unneeded
-function disable_ob() {
-    ini_set('output_buffering', 'off');
-    ini_set('zlib.output_compression', false);
-    ini_set('implicit_flush', true);
-    ob_implicit_flush(true);
-    // Clear, and turn off output buffering
-    while (ob_get_level() > 0) {
-        // Get the curent level
-        $level = ob_get_level();
-        // End the buffering
-        ob_end_clean();
-        // If the current level has not changed, abort
-        if (ob_get_level() == $level) break;
-    }
-    // Disable apache output buffering/compression
-    if (function_exists('apache_setenv')) {
-        apache_setenv('no-gzip', '1');
-        apache_setenv('dont-vary', '1');
-    }
-} */
 
 
 

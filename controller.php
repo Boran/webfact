@@ -527,8 +527,10 @@ END;
       watchdog('webfact', 'runCommand: invalid cmd=' . $cmd);
       return;  // container not running, abort
     }
-    if (($container==null) || ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
-      watchdog('webfact', 'runCommand: container not running');
+    if (($container==null) || 
+      (! isset($container->getRuntimeInformations()['State'])) ||
+      ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
+      watchdog('webfact', 'runCommand: ignore, container not running');
       return;  // container not running, abort
     }
     #watchdog('webfact', 'runCommand: ' . $cmd);
@@ -1076,6 +1078,21 @@ END;
             array('batchSaveCont', array($this->website->nid, $this->id)),
             array('batchRemoveCont', array($this->website->nid, $this->id)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
+            // loop for 3 mins until hopefuly 100% reached
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+
+            array('batchTrack', array($this->website->nid, $this->id, 20)),
+            array('batchTrack', array($this->website->nid, $this->id, 20)),
+            array('batchTrack', array($this->website->nid, $this->id, 20)),
+
+            array('batchTrack', array($this->website->nid, $this->id, 20)),
+            array('batchTrack', array($this->website->nid, $this->id, 20)),
+            array('batchTrack', array($this->website->nid, $this->id, 20)),
           ),
           'finished' => 'batchRebuildDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',

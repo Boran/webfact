@@ -26,6 +26,9 @@
               if (response.buildStatus == 100 || response.buildStatus == 200) {
                 $('#buildstatus').html('<div class="running">completed(' +response.buildStatus +')</div>' );
                 //$('#bs-postfix').html('completed');
+
+                // if there is an alert message box, replace it with "done"
+                $('.alert-success').html('Done');
               }
               else if (response.buildStatus==null) {
                 $('#buildstatus').text('n/a');

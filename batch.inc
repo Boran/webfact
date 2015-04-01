@@ -22,21 +22,25 @@ function batchSaveCont($nid, $title, &$context) {
   $context['finished'] = 1;
 }
 
-function batchRemoveCont($nid, $title, &$context) {
+function batchRemoveCont($nid, $title, $log=1, &$context) {
   $context['finished'] = 0;
   $w= new WebfactController;
   $w->arguments('delete', $nid, 0);  // verbose=0
-  $context['message'] = "delete $title";
-  $context['results']['log'][] = 'deleted';
+  if ($log==1) {
+    $context['results']['log'][] = 'deleted ' . check_plain($title);
+  }
+  $context['message'] = 'deleted ' . check_plain($title);
   $context['finished'] = 1;
 }
 
 /* delete node */
-function batchRemoveNode($nid, $title, &$context) {
+function batchRemoveNode($nid, $title, $log=1, &$context) {
   $context['finished'] = 0;
   node_delete($nid);   // this will trigger deleteContainer() too
   $context['message'] = "delete meta data for $title";
-  $context['results']['log'][] = "delete meta data for $title, node $nid";
+  if ($log==1) {
+    $context['results']['log'][] = "delete meta data for $title, node $nid";
+  }
   $context['finished'] = 1;
 }
 

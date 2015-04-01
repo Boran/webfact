@@ -530,7 +530,7 @@ END;
     if (($container==null) || 
       (! isset($container->getRuntimeInformations()['State'])) ||
       ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
-      watchdog('webfact', 'runCommand: ignore, container not running');
+      #watchdog('webfact', 'runCommand: ignore, container not running');
       return;  // container not running, abort
     }
     #watchdog('webfact', 'runCommand: ' . $cmd);
@@ -711,18 +711,20 @@ END;
         $batch = array(
           'title' => t('Remove meta data & container ' . $this->id),
           'operations' => array(
-            array('batchRemoveCont', array($this->website->nid, $this->id)),
-            array('batchRemoveNode', array($this->website->nid, $this->id)),
+            array('batchRemoveCont', array($this->website->nid, $this->id, 0)),
+            array('batchRemoveNode', array($this->website->nid, $this->id, 0)),
           ),
           'finished' => 'batchDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
         );
         batch_set($batch);
         batch_process('websites'); // go here when done
+        unset($_SESSION['batch_results']);  // empty logs, orther will show on next /advanced visit
 
         #node_delete($this->nid);   // this will trigger deleteContainer() too
         #$this->message("Meta data and website deleted");
         #drupal_goto('/websites');
+        return;
       }
 
 
@@ -2128,7 +2130,7 @@ END;
         '#type'   => 'markup',
         '#markup' => $batchlog,
       );
-      unset($_SESSION['batch_results']);
+      unset($_SESSION['batch_results']);  // empty log for next operation
     }
 
 

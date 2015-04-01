@@ -250,6 +250,7 @@ END;
                   <li><a href="$wpath/proxy2restart/$this->nid$this->des">Restart nginx-gen</a></li>
                   <li><a href="$wpath/proxylogs/$this->nid$this->des">Logs nginx</a></li>
                   <li><a href="$wpath/proxy2logs/$this->nid$this->des">Logs nginx-gen</a></li>
+                  <li><a href="$wpath/proxyconf/$this->nid$this->des">Conf. nginx</a></li>
                 </ul>
               </li>
             </ul>
@@ -515,14 +516,20 @@ END;
 
 
   /*
-   * run a command inside the conatiner and give back the results
+   * run a command inside the container and give back the results
+   * todo: check status code and do a watchdog or interactive error?
+   * Params: 
+   *  command to run
+   *  container name/id
+   *  max number of bytes to read from the result
    */
-  public function runCommand($cmd) {
-    // todo:
-    // - check status code and do a watchdog or interactive error?
+  public function runCommand($cmd, $id='', $maxlength=4096) {
+    if (strlen($id)<1) {
+      $id = $this->id;
+    }
 
     $manager = $this->getContainerManager();
-    $container = $manager->find($this->id);
+    $container = $manager->find($id);
     if (strlen($cmd)<1) {
       watchdog('webfact', 'runCommand: invalid cmd=' . $cmd);
       return;  // container not running, abort
@@ -544,11 +551,12 @@ END;
     #dpm($response->__toString());
     if ($body = $response->getBody()) {
       $body->seek(0);
-      $result = $body->read(4096); // get first 4k, todo: parameter?
+      $result = $body->read($maxlength); // get first XX bytes
     }
     #dpm($result);
     return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
   }
+
 
   /*
    * get the build status number created by start.sh in the boran/drupal image, if available
@@ -1516,14 +1524,15 @@ END;
         $result=$this->contAction();
         break;
 
+
+      // reverse proxy management
       case 'proxy2restart':
       case 'proxyrestart':
-        // The reverse proxy  had an issue
         //$this->id=$this->rproxy;
         if ($action == 'proxy2restart') {
-          $this->id = 'nginx-gen' ;
+          $this->id = variable_get('webfact_rproxygen', 'nginx-gen');
         } else {
-          $this->id = 'nginx';
+          $this->id = $this->rproxy;
         }
         $container = $manager->find($this->id);
         if (! $container) {
@@ -1535,13 +1544,18 @@ END;
         $manager->restart($container);
         break;
 
+      case 'proxyconf':
+        $cmd ='cat /etc/nginx/conf.d/default.conf'; // todo: parameter
+        $log = $this->runCommand($cmd, $this->rproxy, variable_get('webfact_rproxy_confsize', 50000)); 
+        $this->markup = '<pre>' . $cmd . '<br>__________<br>' . $log . '</pre>';
+        break;
 
       case 'proxylogs':
       case 'proxy2logs':
         if ($action == 'proxy2logs') {
-          $this->id = 'nginx-gen';
+          $this->id = variable_get('webfact_rproxygen', 'nginx-gen');
         } else {
-          $this->id = 'nginx';
+          $this->id = $this->rproxy;
         }
         $container = $manager->find($this->id);
         if (! $container) {
@@ -1549,9 +1563,9 @@ END;
           break;
         }
         else {
-          #$logs=$manager->logs($container, false, true, true, false, $this->loglines);
-          $logs=$manager->logs($container, false, true, true, false, 1000);
-          $this->markup = '<pre>Logs for ' . $this->id. ' (1000 lines)<br>';
+          $logs=$manager->logs($container, false, true, true, false, variable_get('webfact_rproxy_loglines', 1000));
+          $this->markup = '<pre>Logs for ' . $this->id. ' (' . variable_get('webfact_rproxy_loglines', 1000) 
+            . ' lines)<br>';
           foreach ($logs as $log) {
             $this->markup .= $log['output'];
           }

@@ -176,9 +176,9 @@ class WebfactController {
                   <li><a href="$wpath/start/$this->nid">Start</a></li>
                   <li><a href="$wpath/restart/$this->nid">Restart</a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/create/$this->nid">Create</a></li>
+                  <li><a href="$wpath/createui/$this->nid">Create</a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/delete/$this->nid" onclick="return confirm('Are you sure?')">Delete container</a></li>
+                  <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Are you sure?')">Delete container</a></li>
                   <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Are you sure?')">Delete container+meta data</a></li>
                 </ul>
               </li>
@@ -706,13 +706,27 @@ END;
         #  $this->message("$this->id does not exist",  'error');
         #  return;
         #}
+
         watchdog('webfact', 'deleteall node id ' . $this->nid);
-        node_delete($this->nid);   // this will trigger deleteContainer() too
-        $this->message("Meta data and website deleted");
-        drupal_goto('/websites');
+        $batch = array(
+          'title' => t('Remove meta data & container ' . $this->id),
+          'operations' => array(
+            array('batchRemoveCont', array($this->website->nid, $this->id)),
+            array('batchRemoveNode', array($this->website->nid, $this->id)),
+          ),
+          'finished' => 'batchDone',
+          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+        );
+        batch_set($batch);
+        batch_process('websites'); // go here when done
+
+        #node_delete($this->nid);   // this will trigger deleteContainer() too
+        #$this->message("Meta data and website deleted");
+        #drupal_goto('/websites');
       }
 
-      else if ($this->action=='delete') {
+
+      else if (($this->action=='delete') || ($this->action=='deleteui') ) {
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
@@ -732,10 +746,24 @@ END;
         }
 
         watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
-        $manager->remove($container);
-        if ($this->verbose===1) {
-          $this->message("$this->action $this->id");
-          drupal_goto("/website/advanced/$this->nid"); // show new status
+        if ($this->action=='deleteui') {  // use batch
+          $batch = array(
+            'title' => t('Remove ' . $this->id),
+            'operations' => array(
+              array('batchRemoveCont', array($this->website->nid, $this->id)),
+            ),
+            'finished' => 'batchDone',
+            'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+          );
+          batch_set($batch);
+          batch_process('website/advanced/' . $this->website->nid); // go here when done
+
+        } else {
+          $manager->remove($container);
+          if ($this->verbose===1) {
+            $this->message("$this->action $this->id");
+            drupal_goto("/website/advanced/$this->nid"); // show new status
+          }
         }
         return;
       }
@@ -1090,6 +1118,36 @@ END;
       }
 
 
+      /* batchAPI wrapper arput "create" for progress bar */
+      else if ($this->action=='createui') {
+        $batch = array(
+          'title' => t('Creating ' . $this->id),
+          'operations' => array(
+            array('batchCreateCont', array($this->website->nid, $this->id)),
+            // loop for 3 mins until hopefuly 100% reached
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
+
+            #array('batchTrack', array($this->website->nid, $this->id, 20)),
+            #array('batchTrack', array($this->website->nid, $this->id, 20)),
+            #array('batchTrack', array($this->website->nid, $this->id, 20)),
+
+            #array('batchTrack', array($this->website->nid, $this->id, 20)),
+            #array('batchTrack', array($this->website->nid, $this->id, 20)),
+            #array('batchTrack', array($this->website->nid, $this->id, 20)),
+          ),
+          'finished' => 'batchRebuildDone',
+          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+        );
+        batch_set($batch);
+        batch_process('website/advanced/' . $this->website->nid); // go here when done
+
+      }
+
       else if ($this->action=='create') {
         // create the container
         $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
@@ -1289,8 +1347,10 @@ END;
         case 'stop':
         case 'start':
         case 'delete':
+        case 'deleteui':
         case 'deleteall':
         case 'create':
+        case 'createui':
         case 'restart':
         case 'pause':
         case 'kill':
@@ -1419,11 +1479,13 @@ END;
       case 'stop':
       case 'start':
       case 'delete':
+      case 'deleteui':
       case 'restart':
       case 'pause':
       case 'kill':
       case 'unpause':
       case 'create':
+      case 'createui':
       case 'rebuild':
       case 'rebuildmeta':
       case 'coappupdate':

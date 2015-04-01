@@ -28,9 +28,18 @@ function batchRemoveCont($nid, $title, &$context) {
   $w->arguments('delete', $nid, 0);  // verbose=0
   $context['message'] = "delete $title";
   $context['results']['log'][] = 'deleted';
-  #$context['sandbox']['progress'] = 20;
   $context['finished'] = 1;
 }
+
+/* delete node */
+function batchRemoveNode($nid, $title, &$context) {
+  $context['finished'] = 0;
+  node_delete($nid);   // this will trigger deleteContainer() too
+  $context['message'] = "delete meta data for $title";
+  $context['results']['log'][] = "delete meta data for $title, node $nid";
+  $context['finished'] = 1;
+}
+
 
 function batchRestartCont($nid, $title, &$context) {
   $context['finished'] = 0;
@@ -38,10 +47,8 @@ function batchRestartCont($nid, $title, &$context) {
   $w->arguments('restart', $nid, 0);  // verbose=0
   $context['message'] = "restart $title";
   $context['results']['log'][] = 'restart';
-  #$context['sandbox']['progress'] = 20;
   $context['finished'] = 1;
 }
-
 
 function batchCreateCont($nid, $title, &$context) {
   $context['finished'] = 0;
@@ -77,13 +84,13 @@ function batchUpdateCont($nid, $title, &$context) {
   $cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact.log "; // todo: parameter
   $w= new WebfactController(0, $nid);
   $logs = $w->runCommand($cmd);
-  #$w->arguments('create', $nid, 0);  // verbose=0
   $context['message'] = "update $title, running ${cmd}";
   $context['results']['log'][] = $logs;
   $context['results']['log'][] = "<br/>See also /tmp/webfact_update.log inside the container";
   $context['sandbox']['progress'] = 50;
   $context['finished'] = 1;
 }
+
 
 
 /*
@@ -119,4 +126,16 @@ function batchUpdateDone($success, $results, $operations) {
   }
 }
 
+function batchDone($success, $results, $operations) {
+  if ($success) {
+    $message = t('Done.');
+  }
+  else {
+    $message = t('The operation had issues.');
+  }
+  drupal_set_message($message);
+  if (isset($results['log'])) {
+    $_SESSION['batch_results'] = $results['log'];
+  }
+}
 

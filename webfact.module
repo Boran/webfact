@@ -220,6 +220,8 @@ function webfact_arguments($path, $action, $id) {
  * b) Only delete if category<>production, but the node will still be gone?
  * ideally there needs to be a pre and post delete hook.
  */
+
+/*
 function webfact_node_delete($node) {
   if ($node->type == 'website') {
     //dpm($node);
@@ -231,7 +233,7 @@ function webfact_node_delete($node) {
     //  $from = drupal_parse_url($_GET['destination']);
     //}
   }
-}
+}*/
 
 /*
  * catch website or template edits

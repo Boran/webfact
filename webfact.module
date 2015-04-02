@@ -45,7 +45,7 @@ function webfact_menu() {
   // admin form in Configuration > Development
   $items['admin/config/development/webfact'] = array(
     'title' => t('Webfactory'),
-    'description' => t('Webfactory docker URL and parameters'),
+    'description' => t('Webfactory settings'),
     'page callback' => 'drupal_get_form',
     'page arguments' => array('webfact_admin_settings'),
     'access arguments' => array('administer site configuration'),
@@ -77,7 +77,13 @@ function webfact_menu() {
 
 // admin form
 function webfact_admin_settings() {
-  $form['webfact_fserver'] = array(
+  $form['webfact_fieldset_server'] = array(
+    '#title' => t('Server container'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_server']['webfact_fserver'] = array(
     '#title' => t('Domain prefix'),
     '#default_value' => variable_get('webfact_fserver', array('')),
     '#description' => t('e.g. webfact.example.ch'),
@@ -85,7 +91,7 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
-  $form['webfact_dserver'] = array(
+  $form['webfact_fieldset_server']['webfact_dserver'] = array(
     '#title' => t('Docker API URL'),
     '#default_value' => variable_get('webfact_dserver', array('')),
     '#description' => t('e.g. unix:///var/run/docker.sock or http://dock.example.ch:2375'),
@@ -93,32 +99,7 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
-  $form['webfact_cont_image'] = array(
-    '#title' => t('Base image for creating containers'),
-    '#default_value' => variable_get('webfact_cont_image', array('')),
-    '#description' => t('e.g. boran/drupal'),
-    '#type' => 'textfield',
-    '#size' => 30,
-    '#maxlength' => 100,
-  );  
-  $form['webfact_restartpolicy'] = array(
-    '#title' => t('New containers should autostart?'),
-    '#default_value' => variable_get('webfact_restartpolicy', array('on-failure')),
-    '#description' => t('The site default behaviour to apply when the container exits, or docker is booted. Either "always" or "on-failure" to restart only when the container exit code is non-zero. This can also be specified per container.'),
-    '#type' => 'textfield',
-    '#size' => 30,
-    '#maxlength' => 30,
-  );
-
-  $form['webfact_rproxy'] = array(
-    '#title' => t('Reverse proxy container ID'),
-    '#default_value' => variable_get('webfact_rproxy', array('nginx')),
-    '#description' => t('e.g. nginx'),
-    '#type' => 'textfield',
-    '#size' => 30,
-    '#maxlength' => 100,
-  );
-  $form['webfact_loglines'] = array(
+  $form['webfact_fieldset_server']['webfact_loglines'] = array(
     '#title' => t('How many lines to tail on logs'),
     '#default_value' => variable_get('webfact_loglines', array('')),
     '#description' => t('e.g. 90'),
@@ -126,35 +107,115 @@ function webfact_admin_settings() {
     '#size' => 10,
     '#maxlength' => 100,
   );
-  $form['webfact_env_server'] = array(
-    '#title' => t('Optional: an environment variable to pass to all containers'),
+  $form['webfact_fieldset_server']['webfact_server_sitesdir'] = array(
+    '#title' => t('A folder for container mountpoints'),
+    '#default_value' => variable_get('webfact_server_sitesdir', array('')),
+    '#description' => t('Default is /opt/sites. When new websites are added, a subfolder is created with the site name. e.g. /data in containers could be mapped to /opt/sites/WEBSITENAME.'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+
+
+  $form['webfact_fieldset_cont'] = array(
+    '#title' => t('New containers'),
+    '#description' => t('Settings for new containers'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_cont']['image'] = array(
+    '#title' => t('Default base image for creating containers (can be overridden in templates and websites)'),
+    '#default_value' => variable_get('webfact_cont_image', array('')),
+    '#description' => t('e.g. boran/drupal'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );  
+  $form['webfact_fieldset_cont']['restartpolicy'] = array(
+    '#title' => t('New containers should start automatically when the docker serevr is rebooted?'),
+    '#default_value' => variable_get('webfact_restartpolicy', array('on-failure')),
+    '#description' => t('The site default behaviour to apply when the container exits, or docker is booted. Either "always" or "on-failure" to restart only when the container exit code is non-zero. This can also be specified per container.'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 30,
+  );
+  $form['webfact_fieldset_cont']['env_server'] = array(
+    '#title' => t('An environment variable to pass to all containers'),
     '#default_value' => variable_get('webfact_env_server', array('')),
     '#description' => t('To identify where containers were created. e.g. WEBFACT_SERVER=foo.example.ch'),
     '#type' => 'textfield',
     '#size' => 30,
     '#maxlength' => 100,
   );
-  $form['webfact_msglevel1'] = array(
+
+
+  $form['webfact_fieldset_rproxy'] = array(
+    '#title' => t('Reverse proxy'),
+    '#description' => t('Settings for the proxy container responsbile for virtual name mapping.'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_rproxy']['rproxy'] = array(
+    '#title' => t('Reverse proxy container ID'),
+    '#default_value' => variable_get('webfact_rproxy', array('nginx')),
+    '#description' => t('default nginx'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_rproxy']['conf'] = array(
+    '#title' => t('Reverse proxy config file'),
+    '#default_value' => variable_get('webfact_rproxy_conf', ''),
+    '#description' => t('default /etc/nginx/conf.d/default.conf'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_rproxy']['rproxygen'] = array(
+    '#title' => t('Reverse proxy generator container ID'),
+    '#default_value' => variable_get('webfact_rproxygen', array('nginx-gen')),
+    '#description' => t('default nginx-gen'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_rproxy']['loglines'] = array(
+    '#title' => t('How many lines to tail on nginx logs'),
+    '#default_value' => variable_get('webfact_rproxy_loglines', array('')),
+    '#description' => t('default 1000'),
+    '#type' => 'textfield',
+    '#size' => 10,
+    '#maxlength' => 100,
+  );
+
+
+  $form['webfact_fieldset_UI'] = array(
+    '#title' => t('User interface'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_UI']['webfact_msglevel1'] = array(
     '#title' => t('Level 1 messages to user: standard'),
     '#default_value' => variable_get('webfact_msglevel1', true),
     '#description' => t('Should always be enabled'),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
-  $form['webfact_msglevel2'] = array(
+  $form['webfact_fieldset_UI']['webfact_msglevel2'] = array(
     '#title' => t('Level 2 messages to user: verbose'),
     '#default_value' => variable_get('webfact_msglevel2', true),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
-  $form['webfact_msglevel3'] = array(
+  $form['webfact_fieldset_UI']['webfact_msglevel3'] = array(
     '#title' => t('Level 3 messages to user: debugging'),
     '#default_value' => variable_get('webfact_msglevel3', true),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
-
-
 
   return system_settings_form($form);
 }
@@ -309,21 +370,17 @@ function webfact_form_validate($form, &$form_state) {
 
 
 /*
- * hook_node_insert();
+ * hook_node_insert()
  * when new websites are added, ensure a mountpoint 
- * /opt/sites/SITE for /data exists
- * Nove /opt/sites must be mounted from the docker server itself,
+ * such as /opt/sites/SITE exist (for /data)
+ * Now /opt/sites must be mounted from the docker server itself,
  * since this gui is running in a container too.
- * Developed for a specific use-case.
+ * todo: Developed for a specific use-case, make more generic?
  */
 function webfact_node_insert($node) {
   if ($node->type == 'website') {
     $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
-    $sitename=$node->field_hostname['und'][0]['value'];
-/*
     #dpm($node);
-    dpm($node->field_hostname['und'][0]['value']);
-    // $node->title
     if (! file_exists($sitesdir)) {
       drupal_set_message("No server folder $sitesdir exists (or is not accessible) for container mounts");
       return;
@@ -331,7 +388,11 @@ function webfact_node_insert($node) {
       drupal_set_message("Server folder (for container mounts) $sitesdir cannot be written to.");
       return;
     }
-*/
+    $sitename = $node->field_hostname['und'][0]['value'];
+    #dpm($sitename);
+    if (! mkdir($sitesdir . '/' . $sitename, 0775) ) {
+      drupal_set_message("Server folder $sitesdir/$sitename could not be created.");
+    }
   }
 }
 

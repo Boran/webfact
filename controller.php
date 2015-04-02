@@ -43,7 +43,7 @@ class WebfactController {
     $this->docker_ports = array();
     $this->fqdn = '';
 
-    # Load configuration defaults, override in settings.php or on admin/config/development/webfact
+    # Load configuration defaults, override in settings.php or on admin/config/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
     //$this->dserver   = variable_get('webfact_dserver', 'tcp://mydockerserver.example.ch:2375');
     $this->dserver   = variable_get('webfact_dserver', 'unix:///var/run/docker.sock');
@@ -1592,7 +1592,7 @@ dpm('coosupdate done');
         break;
 
       case 'proxyconf':
-        $cmd ='cat /etc/nginx/conf.d/default.conf'; // todo: parameter
+        $cmd = 'cat ' . variable_get('webfact_rproxy_conf', '/etc/nginx/conf.d/default.conf');
         $log = $this->runCommand($cmd, $this->rproxy, variable_get('webfact_rproxy_confsize', 50000)); 
         $this->markup = '<pre>' . $cmd . '<br>__________<br>' . $log . '</pre>';
         break;

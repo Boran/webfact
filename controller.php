@@ -72,7 +72,7 @@ class WebfactController {
 
     // define docker connection params
     $this->client = new Docker\Http\DockerClient(array(), $this->dserver);
-    $this->client->setDefaultOption('timeout', 30);     // default should be a parameter?
+    $this->client->setDefaultOption('timeout', variable_get('webfact_api_timeout', 30)); 
     $this->docker = new Docker\Docker($this->client);
 
     // api call: load minimal website infos: node, container name
@@ -1049,7 +1049,7 @@ dpm('coosupdate done');
 
       else if ($this->action=='coappupdate') {
         global $base_root;
-        $this->client->setDefaultOption('timeout', 120);   // backups can take time
+        $this->client->setDefaultOption('timeout', 120);   // can take time
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, website update not allowed.", 'error');
@@ -1130,7 +1130,7 @@ dpm('coosupdate done');
 
       else if ($this->action=='rebuild') {
         global $base_root;
-        $this->client->setDefaultOption('timeout', 60);
+        $this->client->setDefaultOption('timeout', 180);
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
@@ -1384,7 +1384,6 @@ dpm('coosupdate done');
     }
     $this->nid = $id;
 
-    //$this->client->setDefaultOption('timeout', 20);  //todo: parameter
     $this->result = -1;     // default: fail
     $this->status = 'n/a';  // default: unknown
     $owner = 'n/a';
@@ -1642,7 +1641,7 @@ dpm('coosupdate done');
 
       case 'imres':     // restore an image to the current container
       case 'imdel':     // delete a named image
-        $this->client->setDefaultOption('timeout', 25);
+        $this->client->setDefaultOption('timeout', 40);
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
@@ -1703,7 +1702,7 @@ dpm('coosupdate done');
 
 
       case 'impull':  // download the latest version of an image
-        $this->client->setDefaultOption('timeout', 30);
+        $this->client->setDefaultOption('timeout', 60);
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
@@ -1743,7 +1742,7 @@ dpm('coosupdate done');
 
 
       case 'backuplist':  // list images of current container
-        $this->client->setDefaultOption('timeout', 25);
+        $this->client->setDefaultOption('timeout', 60);
         // todo: cache the image list for speed
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
@@ -1828,7 +1827,7 @@ END;
 
       case 'backup':  // commit a container to an image
         global $base_root;
-        $this->client->setDefaultOption('timeout', 30);
+        $this->client->setDefaultOption('timeout', 80);
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;
@@ -1850,7 +1849,7 @@ END;
 
 
       case 'cocmd':
-        $this->client->setDefaultOption('timeout', 30);
+        $this->client->setDefaultOption('timeout', 60);
         $this->markup = '<div class="container-fluid">';
         $html = <<<END
 <!-- Bootstrap: -->

@@ -212,6 +212,8 @@ function webfact_arguments($path, $action, $id) {
   return $w->arguments($action, $id);   // send back render array
 }
 
+
+
 /*
  * hook_node_delete()
  * After deleting website meta data, delete the container too
@@ -219,8 +221,8 @@ function webfact_arguments($path, $action, $id) {
  * a) what about backup images?
  * b) Only delete if category<>production, but the node will still be gone?
  * ideally there needs to be a pre and post delete hook.
+ * Note: disabled in favour of using the batchAPI, e.g. see 'deleteall' in controller.php.
  */
-
 /*
 function webfact_node_delete($node) {
   if ($node->type == 'website') {
@@ -235,9 +237,10 @@ function webfact_node_delete($node) {
   }
 }*/
 
+
+
 /*
  * catch website or template edits
- * todo: templates
  */
 function webfact_form_alter (&$form, &$form_state, $form_id) {
   if (  ($form_id == 'website_node_form') 
@@ -304,4 +307,31 @@ function webfact_form_validate($form, &$form_state) {
 
 }
 
+
+/*
+ * hook_node_insert();
+ * when new websites are added, ensure a mountpoint 
+ * /opt/sites/SITE for /data exists
+ * Nove /opt/sites must be mounted from the docker server itself,
+ * since this gui is running in a container too.
+ * Developed for a specific use-case.
+ */
+function webfact_node_insert($node) {
+  if ($node->type == 'website') {
+    $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
+    $sitename=$node->field_hostname['und'][0]['value'];
+/*
+    #dpm($node);
+    dpm($node->field_hostname['und'][0]['value']);
+    // $node->title
+    if (! file_exists($sitesdir)) {
+      drupal_set_message("No server folder $sitesdir exists (or is not accessible) for container mounts");
+      return;
+    } else if (! is_writable($sitesdir)) {
+      drupal_set_message("Server folder (for container mounts) $sitesdir cannot be written to.");
+      return;
+    }
+*/
+  }
+}
 

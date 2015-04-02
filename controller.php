@@ -279,18 +279,47 @@ END;
        watchdog('webfact', "deleteContainer $name - no such container");
        return;
      }
-     // todo: use nid, not name, and check if in production?
-     #   if (stristr($this->category, 'production')) {
-     #     $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
-     #     return;
-     #   }
-
      if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
        $manager->stop($container);
      }
      $manager->remove($container);
      watchdog('webfact', "deleteContainer $name - removed");
   }
+
+
+  public function stopContainer($name) {
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+     if (!$container) {
+       watchdog('webfact', "stopContainer $name - no such container");
+       return;
+     }
+     if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+       $manager->stop($container);
+     }
+     watchdog('webfact', "stopContainer $name - done");
+  }
+
+
+  /*
+   * rename a container
+   * no checking of permissions,
+   */
+  public function renameContainer($old, $new) {
+     $manager = $this->getContainerManager();
+     $container = $manager->find($old);
+     if (!$container) {
+       watchdog('webfact', "renameContainer $old - no such container");
+       return;
+     }
+     if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+       $manager->stop($container);
+     }
+     $manager->rename($container, $new);
+     watchdog('webfact', "renameContainer $old to $new");
+  }
+
+
 
 
   /*
@@ -727,7 +756,7 @@ END;
         );
         batch_set($batch);
         batch_process('websites'); // go here when done
-        unset($_SESSION['batch_results']);  // empty logs, orther will show on next /advanced visit
+        #unset($_SESSION['batch_results']);  // empty logs, else will show on next /advanced visit
 
         #node_delete($this->nid);   // this will trigger deleteContainer() too
         #$this->message("Meta data and website deleted");
@@ -760,7 +789,7 @@ END;
           $batch = array(
             'title' => t('Remove ' . $this->id),
             'operations' => array(
-              array('batchRemoveCont', array($this->website->nid, $this->id)),
+              array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             ),
             'finished' => 'batchDone',
             'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
@@ -951,7 +980,7 @@ END;
         }
 
         // preconditions:
-        // a) if /data a volume, does sit have a mapping to a host directory?
+        // a) if /data a volume, does it have a mapping to a host directory?
         $datavolsrc = '/data'; // todo: parameter
         $datavol = $container->getRuntimeInformations()['Volumes'];
         if (! isset($datavol[$datavolsrc]) ) {
@@ -961,12 +990,16 @@ END;
         } else {
           $datavolmap = $datavol[$datavolsrc];
           if (strlen($datavolmap)<1) {
-            $this->message("The container does not have a $datavolsrc volume mapped to a server directory.", 'error');
+            $this->message("Container does not have a $datavolsrc volume mapped to a server directory.", 'error');
+            #dpm($datavolmap);
+            return;
+          }
+          else if (strlen($datavolmap)>70) {   // looks like a long patch with a hash
+            $this->message("Container $datavolsrc volume is not mapped to a server directory (found $datavolmap).", 'error');
             #dpm($datavolmap);
             return;
           }
         }
-        #dpm($datavolmap);
 
         // b) /root/backup.sh exists
         $backup="/root/backup.sh";
@@ -980,22 +1013,45 @@ END;
           return;
         }
 
-        // process
-        watchdog('webfact', "coosupdate - backup, update", WATCHDOG_NOTICE);
-        $this->message("Run /root/backup.sh (see results below)", 'status', 2); // check result?
-        $logs = $this->runCommand("/root/backup.sh && ls -altr /data");
-        $this->message("Stop $this->id", 'status', 3);
-        $manager->stop($container);
-        $this->message("Rename $this->id to $this->id" . '-preupdate', 'status', 3);
-        $manager->rename($container, $this->id . '-preupdate');
-        $this->message("Create new $this->id (but how do we know when it is done?)", 'status', 3);
-        $this->create();    // new container from meta data
-
-        $logs .= "<br>, stopping, renaming";
-        $logs .= "<br> build %= " . $this->getContainerBuildStatus();
+#        $this->message("Run /root/backup.sh (see results below)", 'status', 2); // check result?
+#        $logs = $this->runCommand("/root/backup.sh && ls -altr /data");
+#        $this->message("Stop $this->id", 'status', 3);
+#        $manager->stop($container);
+#        $this->message("Rename $this->id to $this->id" . '-preupdate', 'status', 3);
+#        $manager->rename($container, $this->id . '-preupdate');
+#        $this->message("Create new $this->id (but how do we know when it is done?)", 'status', 3);
+#        $this->create();    // new container from meta data
+#        $logs .= "<br>, stopping, renaming";
+#        $logs .= "<br> build %= " . $this->getContainerBuildStatus();
 // XX: need some ajax here too
-        // show output
-        $this->markup = "<h3>Update results</h3>Run /root/backup.sh && ls -altr /data :<pre>$logs</pre>";
+#        // show output
+#        $this->markup = "<h3>Update results</h3>Run /root/backup.sh && ls -altr /data :<pre>$logs</pre>";
+
+        // process: lets do it
+        watchdog('webfact', "coosupdate batch: inside backup, stop, rename, create", WATCHDOG_NOTICE);
+        // update: via batch API
+        $batch = array(
+          'title' => t('Update Container OS '),
+          'init_message' => t('Run backup inside container to /data'),
+          'operations' => array(
+            array('batchCommandCont', array("/root/backup.sh && ls -altr /data", $this->id)),
+            array('batchStopCont', array($this->website->nid, $this->id)),
+            array('batchRemoveCont', array($this->website->nid, $this->id . '-preupdate', 0)),
+            array('batchRenameCont', array($this->id, $this->id . '-preupdate')),
+            array('batchCreateCont', array($this->website->nid, $this->id)),
+            # wait one minute, then loop until fully provisioned
+            array('batchTrack', array($this->website->nid, $this->id, 20)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id)),
+            # next: restore files from /data
+          ),
+          'finished' => 'batchUpdateDone',
+          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+        );
+        batch_set($batch);
+        batch_process('website/advanced/' . $this->website->nid); // go here when done
+dpm('coosupdate done');
         return;
       }
 
@@ -1101,7 +1157,7 @@ END;
           #'init_message' => t('Rebuild starting.'),
           'operations' => array(
             array('batchSaveCont', array($this->website->nid, $this->id)),
-            array('batchRemoveCont', array($this->website->nid, $this->id)),
+            array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
             // loop for 3 mins until hopefuly 100% reached
             array('batchTrack', array($this->website->nid, $this->id, 10)),
@@ -1115,9 +1171,9 @@ END;
             array('batchTrack', array($this->website->nid, $this->id, 20)),
             array('batchTrack', array($this->website->nid, $this->id, 20)),
 
-            array('batchTrack', array($this->website->nid, $this->id, 20)),
-            array('batchTrack', array($this->website->nid, $this->id, 20)),
-            array('batchTrack', array($this->website->nid, $this->id, 20)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id)),
           ),
           'finished' => 'batchRebuildDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',

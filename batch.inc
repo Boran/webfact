@@ -7,6 +7,7 @@
  * Batchapi doc:
  * https://api.drupal.org/api/drupal/includes%21form.inc/group/batch/7
  * https://www.drupal.org/node/180528
+ * http://drupal.stackexchange.com/questions/50996/how-does-the-batch-api-work-internally
  */
 
 /*
@@ -14,18 +15,19 @@
  */
 function batchSaveCont($nid, $title, &$context) {
   $context['finished'] = 0;
+  watchdog('webfact', "batchSaveCont $nid, $title");
   $w= new WebfactController;
   $w->arguments('backup', $nid, 0);  // verbose=0
   $context['message'] = "saved image of $title";
   $context['results']['log'][] = 'saved';
-  #$context['sandbox']['progress'] = 10;
   $context['finished'] = 1;
 }
 
 function batchRemoveCont($nid, $title, $log=1, &$context) {
   $context['finished'] = 0;
+  watchdog('webfact', "batchRemoveCont $nid, $title");
   $w= new WebfactController;
-  $w->arguments('delete', $nid, 0);  // verbose=0
+  $w->deleteContainer($title);
   if ($log==1) {
     $context['results']['log'][] = 'deleted ' . check_plain($title);
   }
@@ -36,6 +38,7 @@ function batchRemoveCont($nid, $title, $log=1, &$context) {
 /* delete node */
 function batchRemoveNode($nid, $title, $log=1, &$context) {
   $context['finished'] = 0;
+  watchdog('webfact', "batchRemoveNode $nid, $title");
   node_delete($nid);   // this will trigger deleteContainer() too
   $context['message'] = "delete meta data for $title";
   if ($log==1) {
@@ -45,8 +48,19 @@ function batchRemoveNode($nid, $title, $log=1, &$context) {
 }
 
 
+function batchStopCont($nid, $title, &$context) {
+  $context['finished'] = 0;
+  watchdog('webfact', "batchStopCont nid=$nid, $title");
+  $w= new WebfactController;
+  $w->stopContainer($title);
+  $context['message'] = "stop $title";
+  $context['results']['log'][] = 'stop';
+  $context['finished'] = 1;
+}
+
 function batchRestartCont($nid, $title, &$context) {
   $context['finished'] = 0;
+  watchdog('webfact', "batchRestartCont nid=$nid, $title");
   $w= new WebfactController;
   $w->arguments('restart', $nid, 0);  // verbose=0
   $context['message'] = "restart $title";
@@ -56,18 +70,41 @@ function batchRestartCont($nid, $title, &$context) {
 
 function batchCreateCont($nid, $title, &$context) {
   $context['finished'] = 0;
+  #watchdog('webfact', "batchCreateCont nid=$nid, $title");
   $w= new WebfactController;
   $w->arguments('create', $nid, 0);  // verbose=0
   $context['message'] = "create $title";
-  $context['results']['log'][] = 'created';
+  $context['results']['log'][] = 'created ' . $title;
   $context['sandbox']['progress'] = 30;
   $context['finished'] = 1;
 }
+
+function batchRenameCont($oldname, $newname, &$context) {
+  $context['finished'] = 0;
+  #watchdog('webfact', "batchRenameCont $oldname to $newname");
+  $w= new WebfactController;
+  $w->renameContainer($oldname, $newname);
+  $context['message'] = "batchRenameCont $oldname to $newname";
+  $context['results']['log'][] = "$oldname to $newname";
+  $context['finished'] = 1;
+}
+
+function batchCommandCont($cmd, $id, &$context) {
+  $context['finished'] = 0;
+  watchdog('webfact', "batchCommandCont " . check_plain($cmd));
+  $w= new WebfactController;
+  $log = $w->runCommand($cmd, $id);
+  $context['message'] = "Run command on $id: " . check_plain($cmd);
+  $context['results']['log'][] = $log;
+  $context['finished'] = 1;
+}
+
 
 function batchTrack($nid, $title, $timer, &$context) {
   $context['finished'] = 0;
   $w= new WebfactController(0, $nid);
   $result = $w->getContainerBuildStatus($nid);
+  watchdog('webfact', "batchTrack nid=$nid, $title, build status=$result");
   if ( ($result==100) || ($result==200) ) {
     // already done, jump back asap
     $context['results']['buildstatus'] = $result;
@@ -81,6 +118,32 @@ function batchTrack($nid, $title, $timer, &$context) {
   $context['sandbox']['build'] = $result;
   $context['finished'] = 1;
 }
+
+function batchWaitInstalled($nid, $title, &$context) {
+  $timer=10;
+  $context['finished'] = 0;
+  $w= new WebfactController(0, $nid);
+  for ($i = 0; $i < 10; $i++) {   // max 100 secs, to avoid browser timeout
+    $result = $w->getContainerBuildStatus($nid);
+    watchdog('webfact', "batchWaitInstalled $i nid=$nid, $title, build status=$result");
+    if ( ($result==100) || ($result==200) ) {
+      // done, jump back asap
+      break;
+    }
+    $context['results']['buildstatus'] = $result;
+    if ($result<100) {   
+      $context['results']['log'][] = "building: installing Drupal ($result)";
+      $context['message'] = "waiting for Drupal installation ($result)";
+    } else {  // post install, e.g. puppet
+      $context['results']['log'][] = "building: tuning container ($result)";
+      $context['message'] = "waiting for container tuning ($result)";
+    }
+    sleep($timer);           // wait
+  }
+  $context['results']['log'][] = "built $result";
+  $context['finished'] = 1;
+}
+
 
 function batchUpdateCont($nid, $title, &$context) {
   $context['finished'] = 0;
@@ -113,8 +176,11 @@ function batchRebuildDone($success, $results, $operations) {
   }
   drupal_set_message($message);
   // Provide data for the redirected page via $_SESSION.
-  $_SESSION['batch_results'] = $results['log'];
+  if (isset($results['log'])) {
+    $_SESSION['batch_results'] = $results['log'];
+  }
 }
+
 
 function batchUpdateDone($success, $results, $operations) {
   if ($success) {

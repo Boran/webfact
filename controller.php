@@ -193,9 +193,7 @@ class WebfactController {
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
-<!-- coosupdate prototype, not ready:
--->
-                  <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup, Stop+rename the container, create new container and restore /var/www/html. Local DB will be lost!. Continue?')">Run container OS update</a></li>
+                  <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup, stop, rename the container create a new container and finally restore /var/www/html/sites. Any other local changes wil be lost (e.g. local DB). Continue?')">Run container OS update</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild from sources</a></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
@@ -1026,16 +1024,21 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
           'operations' => array(
             array('batchCommandCont', array("/root/backup.sh && ls -altr /data", $this->id)),
             # todo: check that /data/html_sites.tgz exists
+            # todo: verify that sql is external
             array('batchStopCont', array($this->website->nid, $this->id)),
             array('batchRemoveCont', array($this->website->nid, $this->id . '-preupdate', 0)),
             array('batchRenameCont', array($this->id, $this->id . '-preupdate')),
             array('batchCreateCont', array($this->website->nid, $this->id)),
             # wait one minute, then loop until fully provisioned
+            array('batchTrack', array($this->website->nid, $this->id, 5)),
+            array('batchTrack', array($this->website->nid, $this->id, 10)),
             array('batchTrack', array($this->website->nid, $this->id, 20)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id)),
-            # todo: restore files from /data/html_sites.tgz
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)), // 2min
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
+            # restore files from /data/html_sites.tgz
+            array('batchCommandCont', array("cd /var/www/html && mv sites sites.$$ && tar xzf /data/html_sites.tgz", $this->id)),
+            array('batchContLog', array($this->website->nid, $this->id, variable_get('webfact_cont_log', '/tmp/webfact.log'))),
           ),
           'finished' => 'batchUpdateDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
@@ -1150,21 +1153,20 @@ dpm('coosupdate done');
             array('batchSaveCont', array($this->website->nid, $this->id)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
-            // loop for 3 mins until hopefuly 100% reached
+            // repeat until hopefuly 100% reached
             array('batchTrack', array($this->website->nid, $this->id, 10)),
             array('batchTrack', array($this->website->nid, $this->id, 10)),
             array('batchTrack', array($this->website->nid, $this->id, 10)),
             array('batchTrack', array($this->website->nid, $this->id, 10)),
             array('batchTrack', array($this->website->nid, $this->id, 10)),
             array('batchTrack', array($this->website->nid, $this->id, 10)),
-
             array('batchTrack', array($this->website->nid, $this->id, 20)),
             array('batchTrack', array($this->website->nid, $this->id, 20)),
             array('batchTrack', array($this->website->nid, $this->id, 20)),
-
-            array('batchWaitInstalled', array($this->website->nid, $this->id)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id)),
+            // loop until hopefuly 100% reached
+            array('batchWaitInstalled', array($this->website->nid, $this->id), 20, 6), // 2min
+            array('batchWaitInstalled', array($this->website->nid, $this->id), 20, 6),
+            array('batchWaitInstalled', array($this->website->nid, $this->id), 20, 6),
           ),
           'finished' => 'batchRebuildDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',

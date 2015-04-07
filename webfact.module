@@ -192,7 +192,7 @@ function webfact_admin_settings() {
 
 
   $form['webfact_fieldset_UI'] = array(
-    '#title' => t('User interface'),
+    '#title' => t('User interface and debugging'),
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
@@ -216,6 +216,13 @@ function webfact_admin_settings() {
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
+  $form['webfact_fieldset_UI']['webfact_rebuild_backups'] = array(
+    '#title' => t('Create automatic backups when rebuilding. Disable this on dev/test servers to save time and diskpace'),
+    '#default_value' => variable_get('webfact_rebuild_backups', true),
+    '#type' => 'checkbox',
+    '#return_value' => 1,
+  );
+
 
   return system_settings_form($form);
 }

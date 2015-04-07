@@ -321,7 +321,7 @@ END;
    * backup a container (commit an image)
    * parameter: container name, returns name of the saved container
    */
-  public function backupContainer($id, $comment='') {
+  public function backupContainer($id, $comment='', $tag_postfix='') {
      $this->client->setDefaultOption('timeout', 80); // can take time
      $manager = $this->getContainerManager();
      $container = $manager->find($id);
@@ -329,9 +329,12 @@ END;
        watchdog('webfact', "backupContainer $id - no such container");
        return;
      }
-     $config = array('tag' => date('Ymd'), 'repo' => $id, 'author' => $this->user,
-      'comment' => $comment,);
+     $config = array('tag' => date('Ymd') . $tag_postfix, 
+       'repo'    => $id, 
+       'author'  => $this->user,
+       'comment' => $comment,);
      $savedimage = $this->docker->commit($container, $config);
+     $savedimage = $savedimage->__toString();
      watchdog('webfact', "backupContainer $id to $savedimage");
      return($savedimage);
   }
@@ -1087,9 +1090,15 @@ dpm('coosupdate done');
           return;
         }
 
-// URGENT FIX 7.4.15: updates do not work via the batch API; why?
+// URGENT FIX 7.4.15: disable batchapi in favour of direct ommand
 /*
-        // Update via batch API
+ updates do not work via the batch API; why?
+ - cannot get logs to both stdout and the /tmp/webfact.log
+ - updating webfact causes: Docker\Exception\APIException: EOF
+ in Docker\Http\Adapter\DockerAdapter->send() (line 77 of /var/www/html/sites/all/libraries/composer/stage1/docker-php/src/Docker/Http/Adapter/DockerAdap
+ - todo: come back and investigate
+
+        // Update via batch API: for a better user experince (progress bar), and the option to do stuff in setps.
         $batch = array(
           'title' => t('Run Website update'),
           #'init_message' => t('Website update starting.'),
@@ -1108,6 +1117,13 @@ dpm('coosupdate done');
 */
 
 // Directly, without batch:
+// XX
+        // backup, stop, delete:
+        if (variable_get('webfact_rebuild_backups', 1) == 1 ) {
+          $savedimage = $this->backupContainer($this->id, "saved before app update on $base_root", '-before-update');
+          $this->message("Saved to " . $savedimage, 'status', 3);
+        }
+
         $this->message("Run webfact_update.sh (see results below)", 'status', 2);
         watchdog('webfact', "coappupdate $this->id - run webfact_update.sh, log to /tmp/webfact.log", WATCHDOG_NOTICE);
         #$cmd='ps';

@@ -317,7 +317,24 @@ END;
      watchdog('webfact', "renameContainer $old to $new");
   }
 
-
+  /*
+   * backup a container (commit an image)
+   * parameter: container name, returns name of the saved container
+   */
+  public function backupContainer($id, $comment='') {
+     $this->client->setDefaultOption('timeout', 80); // can take time
+     $manager = $this->getContainerManager();
+     $container = $manager->find($id);
+     if (!$container) {
+       watchdog('webfact', "backupContainer $id - no such container");
+       return;
+     }
+     $config = array('tag' => date('Ymd'), 'repo' => $id, 'author' => $this->user,
+      'comment' => $comment,);
+     $savedimage = $this->docker->commit($container, $config);
+     watchdog('webfact', "backupContainer $id to $savedimage");
+     return($savedimage);
+  }
 
 
   /*
@@ -550,7 +567,7 @@ END;
    *  container name/id
    *  max number of bytes to read from the result
    */
-  public function runCommand($cmd, $id='', $maxlength=4096) {
+  public function runCommand($cmd, $id='', $maxlength=4096, $verbose=0) {
     if (strlen($id)<1) {
       $id = $this->id;
     }
@@ -567,9 +584,12 @@ END;
       #watchdog('webfact', 'runCommand: ignore, container not running');
       return;  // container not running, abort
     }
-    #watchdog('webfact', 'runCommand: ' . $cmd);
+    if ($verbose==1 ) {
+      watchdog('webfact', 'runCommand: ' . $cmd);
+      #$this->message("Running command: $cmd", 'status', 4);
+    }
 
-    $this->message("Running command: $cmd", 'status', 4);
+    # todo: nice to lower priority
     $execid = $manager->exec($container, ['/bin/bash', '-c', $cmd]);
     #dpm("Exec ID= <" . $execid. ">\n");
     #$response = $manager->execstart($execid, function(){} ,false,false);
@@ -579,10 +599,13 @@ END;
     if ($body = $response->getBody()) {
       $body->seek(0);
       $result = $body->read($maxlength); // get first XX bytes
-    }
-    #dpm($result);
+      
+    #if ($verbose==1 ) {
+    #  dpm($result);
+    #}
     return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
   }
+}
 
 
   /*
@@ -1063,21 +1086,34 @@ dpm('coosupdate done');
           drupal_goto("/website/advanced/$this->nid"); // go back to status page
           return;
         }
+
+// URGENT FIX 7.4.15: updates do not work via the batch API; why?
+/*
         // Update via batch API
         $batch = array(
           'title' => t('Run Website update'),
           #'init_message' => t('Website update starting.'),
           'operations' => array(
-            array('batchSaveCont',   array($this->website->nid, $this->id)),
-            array('batchUpdateCont', array($this->website->nid, $this->id)),
+#            array('batchSaveCont',   array($this->website->nid, $this->id)),
+            array('batchCommandCont', array('cd /var/www/html && ./webfact_update.sh', $this->id)),
             # Do we really need to restart?
             #array('batchRestartCont',array($this->website->nid, $this->id)),
+            array('batchContLog', array($this->website->nid, $this->id, variable_get('webfact_cont_log', '/tmp/webfact.log'))),
           ),
           'finished' => 'batchUpdateDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
         );
         batch_set($batch);
         batch_process('website/advanced/' . $this->website->nid); // go here when done
+*/
+
+// Directly, without batch:
+        $this->message("Run webfact_update.sh (see results below)", 'status', 2);
+        watchdog('webfact', "coappupdate $this->id - run webfact_update.sh, log to /tmp/webfact.log", WATCHDOG_NOTICE);
+        #$cmd='ps';
+        $cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact.log "; // todo: parameter
+        $logs = $this->runCommand($cmd);
+        $this->markup = "<h3>Update results</h3><p>Running '${cmd}':</p><pre>$logs</pre><p>See also /tmp/webfact_update.log</p>";   // show output
         return;
       }
 
@@ -1872,21 +1908,6 @@ END;
           $cmd = $_url['query']['cmd'];   // todo: security checking?
           $result = $this->runCommand($cmd);
           $this->markup .= "<pre>Output of the command '$cmd':<br>" . $result . '</pre>';
-/*
-          $container = $manager->find($this->id);
-          if ($container->getRuntimeInformations()['State']['Running'] == FALSE) {
-            $this->message("$this->id must be started", 'warning');
-            break;
-          }
-          // todo: if cmd had several parts, create an array?
-          #$cmds = preg_split ('/[\s]+/', $cmd);
-          #$execid = $manager->exec($container, $cmds);
-
-          $execid = $manager->exec($container, ['/bin/bash', '-c', $cmd]);
-          #dpm("Exec ID= <" . $execid. ">\n");
-          $result = $manager->execstart($execid);
-          $this->markup .= "<pre>Output of the command '$cmd':<br>" . $result->__toString() . '</pre>';
-*/
         }
         break;
 

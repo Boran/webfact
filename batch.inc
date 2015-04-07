@@ -14,13 +14,13 @@
 /*
  * batch commands/operations
  */
-function batchSaveCont($nid, $title, &$context) {
+function batchSaveCont($nid, $name, &$context) {
   $context['finished'] = 0;
-  watchdog('webfact', "batchSaveCont $nid, $title");
+  watchdog('webfact', "batchSaveCont $name");
   $w= new WebfactController;
-  $w->arguments('backup', $nid, 0);  // verbose=0
-  $context['message'] = "saved image of " . check_plain($title);
-  $context['results']['log'][] =  date("H:i:s") . ' saved';
+  $result = $w->backupContainer($name);
+  $context['message'] = "saved image of $name to $result";
+  $context['results']['log'][] =  date("H:i:s") . " saved image to $result";
   $context['finished'] = 1;
 }
 
@@ -92,25 +92,12 @@ function batchRenameCont($oldname, $newname, &$context) {
 
 function batchCommandCont($cmd, $id, &$context) {
   $context['finished'] = 0;
-  watchdog('webfact', "batchCommandCont $id <" . $cmd . ">");
+  watchdog('webfact', "batchCommandCont $id cmd=$cmd.");
   $w= new WebfactController;
   $log = $w->runCommand($cmd, $id);
   $context['message'] = "Run command on $id: " . check_plain($cmd);
   $context['results']['log'][] = date("H:i:s") . ' ' . $log;
-  watchdog('webfact', "batchCommandCont done");
-  $context['finished'] = 1;
-}
-
-function batchUpdateCont($nid, $title, &$context) {
-  $context['finished'] = 0;
-  $logfile = variable_get('webfact_cont_log', '/tmp/webfact.log');
-  $cmd = "cd /var/www/html && ./webfact_update.sh |tee -a $logile";
-  $w= new WebfactController(0, $nid);
-  $logs = $w->runCommand($cmd);
-  $context['message'] = "update $title, running ${cmd}";
-  $context['results']['log'][] = $logs;
-  $context['results']['log'][] = "<br/>See also $logfile inside the container";
-  $context['sandbox']['progress'] = 50;
+  #watchdog('webfact', "batchCommandCont done");
   $context['finished'] = 1;
 }
 
@@ -118,16 +105,19 @@ function batchUpdateCont($nid, $title, &$context) {
 /*
  * logging: append batch log to container log
  */
-function batchContLog($nid, $title, $logfile, &$context) {
+function batchContLog($nid, $id, $logfile, &$context) {
   $context['finished'] = 0;
-  watchdog('webfact', "batchContLog $logfile");
+  #watchdog('webfact', "batchContLog $logfile");
   if (is_array($context['results']['log'])) {
     $w= new WebfactController(0, $nid);
 
     foreach ($context['results']['log'] as $line) {
-      watchdog('webfact', ">> " . $line);
-      #$cmd = "echo '${line}' >> $logfile";
-      #$res = $w->runCommand($cmd);
+      if (is_array($line) ) {
+        $line = implode("|", $line);
+      }
+      $line = preg_replace('/\s+/', ' ', $line);  // remove new lines
+      # Todo: cannot get it to write to the log file:
+      $res = $w->runCommand("echo '${line}' >> $logfile");
     }
     $context['message'] = "update $logfile";
     $context['results']['log'][] = date("H:i:s") . " update $logfile";
@@ -141,7 +131,7 @@ function batchContLog($nid, $title, $logfile, &$context) {
 /*
  * tracking progress
  */
-function batchTrack($nid, $title, $timer, &$context) {
+function batchTrack($nid, $id, $timer, &$context) {
   if ( isset($context['results']['done']) ) {
     #watchdog('webfact', "batchTrack ignore since results=done");
     $context['finished'] = 1;
@@ -150,7 +140,7 @@ function batchTrack($nid, $title, $timer, &$context) {
   $context['finished'] = 0;
   $w= new WebfactController(0, $nid);
   $result = $w->getContainerBuildStatus($nid);
-  watchdog('webfact', "batchTrack nid=$nid, $title, build status=$result");
+  watchdog('webfact', "batchTrack nid=$nid, $id, build status=$result");
   #if ( ($result==100) || ($result==200) ) {
   if ( $result == variable_get('webfact_build_done_value', 200) ) {
     // already done, jump back asap

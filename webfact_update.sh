@@ -11,7 +11,6 @@ echo "___________ `date '+%Y-%m-%d %H:%M'` _________________";
 echo "Running webfact_update.sh: updating elements of a Webfactory UI";
 cd /var/www/html
 if [ -d '.git' ] ; then
-  echo "-- todo: dump the db and files to /data (or other external volume)"
   if [ -x /root/backup.sh ] ; then
     echo "-- backup: running /root/backup.sh /data"
   fi;

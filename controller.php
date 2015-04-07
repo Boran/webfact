@@ -399,6 +399,12 @@ END;
     if (isset($this->env_server)) {     // pull in default env
       $this->docker_env[] = $this->env_server;
     }
+    // Create a '/data' volume by default?
+    if (variable_get('webfact_data_volume', 1) == 1 ) {
+      $this->docker_vol[] = "/data =>{}";
+      $this->docker_start_vol[] = variable_get('webfact_server_sitesdir', '/opt/sites/') 
+        . $this->id . ":/data:rw";
+    }
 
     // Template? : Load values there first
     if (isset($this->website->field_template['und'][0]['target_id'])) {
@@ -1198,6 +1204,7 @@ dpm('coosupdate done');
 
         // Rebuilding via batch API
         watchdog('webfact', "rebuild batch- backup, stop, delete, create from sources", WATCHDOG_NOTICE);
+        // todo: onlky backup if (variable_get('webfact_rebuild_backups', 1) == 1 ) {
         $batch = array(
           'title' => t('Rebuilding from sources'),
           #'init_message' => t('Rebuild starting.'),
@@ -1216,9 +1223,9 @@ dpm('coosupdate done');
             array('batchTrack', array($this->website->nid, $this->id, 20)),
             array('batchTrack', array($this->website->nid, $this->id, 20)),
             // loop until hopefuly 100% reached
-            array('batchWaitInstalled', array($this->website->nid, $this->id), 20, 6), // 2min
-            array('batchWaitInstalled', array($this->website->nid, $this->id), 20, 6),
-            array('batchWaitInstalled', array($this->website->nid, $this->id), 20, 6),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)), // 2min
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
           ),
           'finished' => 'batchRebuildDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',

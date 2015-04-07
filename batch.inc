@@ -16,11 +16,16 @@
  */
 function batchSaveCont($nid, $name, &$context) {
   $context['finished'] = 0;
-  watchdog('webfact', "batchSaveCont $name");
-  $w= new WebfactController;
-  $result = $w->backupContainer($name);
-  $context['message'] = "saved image of $name to $result";
-  $context['results']['log'][] =  date("H:i:s") . " saved image to $result";
+  if (variable_get('webfact_rebuild_backups', 1) == 1 ) {
+    watchdog('webfact', "batchSaveCont $name");
+    $w= new WebfactController;
+    $result = $w->backupContainer($name);
+    $context['message'] = "saved image of $name to $result";
+    $context['results']['log'][] =  date("H:i:s") . " saved image to $result";
+  } else {
+    $context['message'] = "no backup needed";
+    $context['results']['log'][] =  date("H:i:s") . " No backup done: rebuild backups disabled.";
+  }
   $context['finished'] = 1;
 }
 

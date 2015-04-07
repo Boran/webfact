@@ -86,17 +86,18 @@ function batchRenameCont($oldname, $newname, &$context) {
   $w= new WebfactController;
   $w->renameContainer($oldname, $newname);
   $context['message'] = "batchRenameCont $oldname to $newname";
-  $context['results']['log'][] = date("H:i:s") . "rename $oldname to $newname";
+  $context['results']['log'][] = date("H:i:s") . " rename $oldname to $newname";
   $context['finished'] = 1;
 }
 
 function batchCommandCont($cmd, $id, &$context) {
   $context['finished'] = 0;
-  watchdog('webfact', "batchCommandCont " . check_plain($cmd));
+  watchdog('webfact', "batchCommandCont $id <" . $cmd . ">");
   $w= new WebfactController;
   $log = $w->runCommand($cmd, $id);
   $context['message'] = "Run command on $id: " . check_plain($cmd);
   $context['results']['log'][] = date("H:i:s") . ' ' . $log;
+  watchdog('webfact', "batchCommandCont done");
   $context['finished'] = 1;
 }
 
@@ -119,12 +120,14 @@ function batchUpdateCont($nid, $title, &$context) {
  */
 function batchContLog($nid, $title, $logfile, &$context) {
   $context['finished'] = 0;
-  if (isset($context['results']['log'])) {
+  watchdog('webfact', "batchContLog $logfile");
+  if (is_array($context['results']['log'])) {
     $w= new WebfactController(0, $nid);
 
     foreach ($context['results']['log'] as $line) {
-      $cmd = "echo '${line}' >> $logfile";
-      $res = $w->runCommand($cmd);
+      watchdog('webfact', ">> " . $line);
+      #$cmd = "echo '${line}' >> $logfile";
+      #$res = $w->runCommand($cmd);
     }
     $context['message'] = "update $logfile";
     $context['results']['log'][] = date("H:i:s") . " update $logfile";
@@ -140,7 +143,7 @@ function batchContLog($nid, $title, $logfile, &$context) {
  */
 function batchTrack($nid, $title, $timer, &$context) {
   if ( isset($context['results']['done']) ) {
-    watchdog('webfact', "batchTrack ignore since results=done");
+    #watchdog('webfact', "batchTrack ignore since results=done");
     $context['finished'] = 1;
     return;
   }
@@ -152,7 +155,7 @@ function batchTrack($nid, $title, $timer, &$context) {
   if ( $result == variable_get('webfact_build_done_value', 200) ) {
     // already done, jump back asap
     $context['results']['buildstatus'] = $result;
-    $context['results']['done'] = true;
+    $context['results']['done'] = true; // flag: no further processing
   } else {
     sleep($timer);
     $result = $w->getContainerBuildStatus($nid);
@@ -171,7 +174,7 @@ function batchTrack($nid, $title, $timer, &$context) {
 
 function batchWaitInstalled($nid, $title, $timer, $count, &$context) {
   if ( isset($context['results']['done']) ) {
-    watchdog('webfact', "batchWaitInstalled ignore since results=done");
+    #watchdog('webfact', "batchWaitInstalled ignore since results=done");
     $context['finished'] = 1;
     return;
   }
@@ -182,7 +185,7 @@ function batchWaitInstalled($nid, $title, $timer, $count, &$context) {
     watchdog('webfact', "batchWaitInstalled $i nid=$nid, $title, build status=$result");
     if ( $result == variable_get('webfact_build_done_value', 200) ) {
       $context['results']['log'][] = date("H:i:s") . " $result";
-      $context['results']['done'] = true;
+      $context['results']['done'] = true; // flag: no further procesing
       // done, jump back asap
       break;
     }

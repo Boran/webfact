@@ -700,8 +700,8 @@ END;
       else if ($this->action=='events') {
         // todo: hangs and gives nothing back
         //$response = $this->client->get(["/events",[]]);
-        $response = $this->client->get(["/events?since=2014-12-23",[]]);
-        //$response = $this->client->get("/events?filter{'container':'mycontainer'}");
+        $response = $this->client->get(["/events?since=2015-04-02",[]]);
+        //$response = $this->client->get("/events?filter{'container':" . $this->id . "}");
         $this->markup = 'Docker events: <pre>' .$response->getBody() . '</pre>';
       }
 

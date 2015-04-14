@@ -539,7 +539,8 @@ END;
         }
       }
     }
-    sort($this->docker_env);
+    //  actualy, do not sort the array, to preserve the order of settings, allowing override
+    //sort($this->docker_env);
 
     if (!empty($this->website->field_docker_restartpolicy['und'][0]) ) {
       $this->restartpolicy= $this->website->field_docker_restartpolicy['und'][0]['value'];

@@ -124,7 +124,7 @@ function webfact_admin_settings() {
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
-  $form['webfact_fieldset_cont']['image'] = array(
+  $form['webfact_fieldset_cont']['webfact_cont_image'] = array(
     '#title' => t('Default base image for creating containers (can be overridden in templates and websites)'),
     '#default_value' => variable_get('webfact_cont_image', array('')),
     '#description' => t('e.g. boran/drupal'),
@@ -132,7 +132,7 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );  
-  $form['webfact_fieldset_cont']['restartpolicy'] = array(
+  $form['webfact_fieldset_cont']['webfact_restartpolicy'] = array(
     '#title' => t('New containers should start automatically when the docker server is rebooted?'),
     '#default_value' => variable_get('webfact_restartpolicy', array('on-failure')),
     '#description' => t('The site default behaviour to apply when the container exits, or docker is booted. Either "always" or "on-failure" to restart only when the container exit code is non-zero. This can also be specified per container.'),
@@ -140,7 +140,7 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 30,
   );
-  $form['webfact_fieldset_cont']['env_server'] = array(
+  $form['webfact_fieldset_cont']['webfact_env_server'] = array(
     '#title' => t('An environment variable to pass to all containers'),
     '#default_value' => variable_get('webfact_env_server', array('')),
     '#description' => t('To identify where containers were created. e.g. WEBFACT_SERVER=foo.example.ch'),
@@ -164,7 +164,7 @@ function webfact_admin_settings() {
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
-  $form['webfact_fieldset_rproxy']['rproxy'] = array(
+  $form['webfact_fieldset_rproxy']['webfact_rproxy'] = array(
     '#title' => t('Reverse proxy container ID'),
     '#default_value' => variable_get('webfact_rproxy', array('nginx')),
     '#description' => t('default nginx'),
@@ -172,7 +172,7 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
-  $form['webfact_fieldset_rproxy']['conf'] = array(
+  $form['webfact_fieldset_rproxy']['webfact_rproxy_conf'] = array(
     '#title' => t('Reverse proxy config file'),
     '#default_value' => variable_get('webfact_rproxy_conf', ''),
     '#description' => t('default /etc/nginx/conf.d/default.conf'),
@@ -180,7 +180,7 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
-  $form['webfact_fieldset_rproxy']['rproxygen'] = array(
+  $form['webfact_fieldset_rproxy']['webfact_rproxygen'] = array(
     '#title' => t('Reverse proxy generator container ID'),
     '#default_value' => variable_get('webfact_rproxygen', array('nginx-gen')),
     '#description' => t('default nginx-gen'),
@@ -188,7 +188,7 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
-  $form['webfact_fieldset_rproxy']['loglines'] = array(
+  $form['webfact_fieldset_rproxy']['webfact_rproxy_loglines'] = array(
     '#title' => t('How many lines to tail on nginx logs'),
     '#default_value' => variable_get('webfact_rproxy_loglines', array('')),
     '#description' => t('default 1000'),

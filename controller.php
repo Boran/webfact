@@ -880,7 +880,7 @@ END;
             sort($cont['Config']['Env']);
             foreach($cont['Config']['Env'] as $envline) {
               // hide variables that might containing passwords
-              if (! preg_match('/$envline|_PW|_GIT_REPO/', $envline)) {
+              if (! preg_match('/$envline|_PW|_GIT_REPO|_PASSWORD/', $envline)) {
                 $this->markup .= $envline .'<br>';
               }
             }

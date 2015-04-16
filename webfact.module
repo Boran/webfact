@@ -198,6 +198,47 @@ function webfact_admin_settings() {
   );
 
 
+  // webfact_manage_db_host webfact_manage_db_user webfact_manage_db_pw
+  $form['webfact_fieldset_db'] = array(
+    '#title' => t('Database management'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_db']['webfact_manage_db'] = array(
+    '#title' => t('Manage an external DB for all containers'),
+    '#default_value' => variable_get('webfact_manage_db', 0),
+    '#description' => t('Create a new DB for each new container in a dedicated DB instance. If not set, assume that DBs are created within containers themselves.'),
+    '#type' => 'checkbox',
+    '#return_value' => 1,
+  );
+  $form['webfact_fieldset_db']['webfact_manage_db_host'] = array(
+    '#title' => t('Hostname or IP of the DB server'),
+    '#default_value' => variable_get('webfact_manage_db_host', array('')),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_db']['webfact_manage_db_user'] = array(
+    '#title' => t('Sql username'),
+    '#default_value' => variable_get('webfact_manage_db_user', array('')),
+    '#description' => t('This user must have the right to create DBs'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_db']['webfact_manage_db_pw'] = array(
+    '#title' => t('Sql password'),
+    '#default_value' => variable_get('webfact_manage_db_pw', array('')),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+
+
+
+
+
   $form['webfact_fieldset_UI'] = array(
     '#title' => t('User interface and debugging'),
     '#type' => 'fieldset',

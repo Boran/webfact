@@ -348,6 +348,8 @@ END;
      // todo: make sure $id and all "this" stuff is loaded
      $manager = $this->getContainerManager();
 
+     $this->createDB($verbose);   // if an external DB is needed
+
      // create the container
         $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
                    'Env'  => $this->docker_env, 'Volumes'  => $this->docker_vol
@@ -548,7 +550,7 @@ END;
     #dpm($this->restartpolicy);
 
     #dpm($this->docker_start_vol);
-    if (empty($this->docker_start_vol)) {  // API will not accept an empty Binds
+    if (empty($this->docker_start_vol)) {  // API will not accept an empty Bind
       $this->startconfig = [
         'RestartPolicy'=> [ 'MaximumRetryCount'=>3, 'Name'=> $this->restartpolicy ],
         'PortBindings'  => $this->docker_ports,
@@ -608,7 +610,7 @@ END;
     #dpm($response->__toString());
     if ($body = $response->getBody()) {
       $body->seek(0);
-      $result = $body->read($maxlength); // get first XX bytes
+      $result = $body->read($maxlength); // get first xx bytes
       
     #if ($verbose==1 ) {
     #  dpm($result);
@@ -752,6 +754,101 @@ END;
         $this->message($e->getMessage(), 'error');
       }
     }
+  }
+
+
+  /*
+   * createDB()
+   * the website database can be external, as opposed to being inside the container.
+   * When inside theconatainer, the boran/drupal image takes care of db creation, but if
+   * external, webfact need to create a new database
+   * params: new DB and user name, verbose messages.
+   */
+  private function createDB($verbose=1) {
+    if (variable_get('webfact_manage_db',0) == 0) {
+      return 1;    // do not manage DB
+    }
+    $newdb = 'drupal_' . $this->id; // naming convertion for drupal DB & username
+
+    watchdog('webfact', 'Creating new database and writing mysql settings to the docker env field for ' . $newdb);
+    $mysqlhost=variable_get('webfact_manage_db_host');
+    $mysqluser=variable_get('webfact_manage_db_user');
+    $mysqlpw=variable_get('webfact_manage_db_pw');
+
+    $this->website = node_load($this->nid);
+    if ($this->website==null) {
+      $this->message("createDB: node $this->nid not found", 'error');
+      return;
+    }
+    // get current mysql password, if thee is one from the website node
+    if (!empty($this->website->field_docker_environment['und']) ) {
+      foreach ($this->website->field_docker_environment['und'] as $row) {
+        if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
+          $pw=$matches[1];   // override default
+        }
+      }
+    } else {
+      // generate a password (todo: improve randomness?)
+      $pw = substr(md5(uniqid()), 0, 8); 
+    }
+
+    $conn = new mysqli($mysqlhost, $mysqluser, $mysqlpw, 'mysql');
+    if ($conn->connect_error) {
+      if ($verbose==1) {
+        #trigger_error('Database connection failed: '  . $conn->connect_error, E_USER_ERROR);
+        $this->message("Cannot connect to database (host=$mysqlhost, user=$mysqluser)", 'error');
+      }
+      watchdog('webfact', "Cannot connect to database (host=$mysqlhost, user=$mysqluser)", array(), WATCHDOG_ERROR);
+      return 0;
+    }
+    if (!$conn->query("call CreateAppDB('$newdb', '$newdb', '$pw')")) {
+      if ($verbose==1) {
+        $this->message($conn->error, 'warning');
+      }
+      watchdog('webfact', $conn->error, array(), WATCHDOG_ERROR);
+    }
+    
+    // save the mysql values to the node
+    // a) update existing values
+    $i=0; $found=0;
+    if (!empty($this->website->field_docker_environment['und']) ) {
+      foreach ($this->website->field_docker_environment['und'] as $row) {
+        if ( preg_match("/MYSQL_DATABASE=(.+)/", $row['safe_value'], $matches) ) {
+          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_DATABASE=$newdb";
+          $found=1;
+          #dpm($this->website->field_docker_environment['und'][$i]['value']);
+        }
+        if ( preg_match("/MYSQL_USER=(.+)/", $row['safe_value'], $matches) ) {
+          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_USER=$newdb";
+          $found=1;
+          #dpm($this->website->field_docker_environment['und'][$i]['value']);
+        }
+        if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
+          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_PASSWORD=$pw";
+          $found=1;
+          #dpm($this->website->field_docker_environment['und'][$i]['value']);
+        }
+        $i++;
+      }
+    }
+    // b) create new values
+    // TODO: existing enviroment settings will be overwritten, need to add to the end?
+    if ($found == 0) {
+      $this->website->field_docker_environment['und'][0]['value'] = "MYSQL_DATABASE=$newdb";
+      $this->website->field_docker_environment['und'][1]['value'] = "MYSQL_USER=$newdb";
+      $this->website->field_docker_environment['und'][2]['value'] = "MYSQL_PASSWORD=$pw";
+    }
+    $this->website->revision = 1;    // history of changes
+    $this->website->log = "change mysql settings after db creation, by $this->user on " . date('c');
+    node_save($this->website);     // Save the updated node
+    $this->website=node_load($this->website->nid);  # reload cache
+
+
+    // finally tell the container that the DB is external
+    $this->docker_env[] = "MYSQL_HOST=$mysqlhost";
+    #dpm($this->docker_env);
+    $conn->close();
+    return 1;
   }
 
 
@@ -1268,9 +1365,13 @@ dpm('coosupdate done');
       }
 
       else if ($this->action=='create') {
+        $this->createDB($verbose);  // if an an external DB is needed
+        // todo: abort here if return=false?
+
         // create the container
         $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
                    'Env'  => $this->docker_env, 'Volumes'  => $this->docker_vol
+
         ];
         #dpm($config);
         $container= new Docker\Container($config);

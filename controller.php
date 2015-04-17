@@ -768,8 +768,13 @@ END;
     if (variable_get('webfact_manage_db',0) == 0) {
       return 1;    // do not manage DB
     }
-    //$newdb = 'drupal_' . $this->id; // naming convertion for drupal DB & username
-    $newdb = $this->id; // naming convention: for drupal DB & username
+   
+    // naming convertion for DB & usernames: add a prefix to avoid mysql restrictions
+    $newuser = 'u_' . $this->id;
+    if (strlen($newuser) > 16) {   // trim username
+      $newuser = substr($newuser, 0, 15);
+    }
+    $newdb = 'd_' . $this->id; 
 
     watchdog('webfact', 'Creating new database and writing mysql settings to the docker env field for ' . $newdb);
     $mysqlhost=variable_get('webfact_manage_db_host');
@@ -786,6 +791,7 @@ END;
       foreach ($this->website->field_docker_environment['und'] as $row) {
         if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
           $pw=$matches[1];   // override default
+          watchdog('webfact', 'createDB() use existing password');
         }
       }
     } else {
@@ -802,11 +808,11 @@ END;
       watchdog('webfact', "Cannot connect to database (host=$mysqlhost, user=$mysqluser)", array(), WATCHDOG_ERROR);
       return 0;
     }
-    if (!$conn->query("call CreateAppDB('$newdb', '$newdb', '$pw')")) {
+    if (!$conn->query("call CreateAppDB('$newdb', '$newuser', '$pw')")) {
       if ($verbose==1) {
         $this->message($conn->error, 'warning');
       }
-      watchdog('webfact', $conn->error, array(), WATCHDOG_ERROR);
+      watchdog('webfact', 'CreateAppDB: ' . $conn->error, array(), WATCHDOG_ERROR);
     }
     
     // save the mysql values to the node
@@ -820,7 +826,7 @@ END;
           #dpm($this->website->field_docker_environment['und'][$i]['value']);
         }
         if ( preg_match("/MYSQL_USER=(.+)/", $row['safe_value'], $matches) ) {
-          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_USER=$newdb";
+          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_USER=$newuser";
           $found=1;
           #dpm($this->website->field_docker_environment['und'][$i]['value']);
         }
@@ -836,7 +842,7 @@ END;
     // TODO: existing enviroment settings will be overwritten, need to add to the end?
     if ($found == 0) {
       $this->website->field_docker_environment['und'][0]['value'] = "MYSQL_DATABASE=$newdb";
-      $this->website->field_docker_environment['und'][1]['value'] = "MYSQL_USER=$newdb";
+      $this->website->field_docker_environment['und'][1]['value'] = "MYSQL_USER=$newuser";
       $this->website->field_docker_environment['und'][2]['value'] = "MYSQL_PASSWORD=$pw";
     }
     $this->website->revision = 1;    // history of changes
@@ -847,6 +853,9 @@ END;
 
     // finally tell the container that the DB is external
     $this->docker_env[] = "MYSQL_HOST=$mysqlhost";
+    $this->docker_env[] = "MYSQL_DATABASE=$newdb";
+    $this->docker_env[] = "MYSQL_USER=$newuser";
+    $this->docker_env[] = "MYSQL_PASSWORD=$pw";
     #dpm($this->docker_env);
     $conn->close();
     return 1;

@@ -768,7 +768,8 @@ END;
     if (variable_get('webfact_manage_db',0) == 0) {
       return 1;    // do not manage DB
     }
-    $newdb = 'drupal_' . $this->id; // naming convertion for drupal DB & username
+    //$newdb = 'drupal_' . $this->id; // naming convertion for drupal DB & username
+    $newdb = $this->id; // naming convention: for drupal DB & username
 
     watchdog('webfact', 'Creating new database and writing mysql settings to the docker env field for ' . $newdb);
     $mysqlhost=variable_get('webfact_manage_db_host');

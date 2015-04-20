@@ -450,8 +450,10 @@ function webfact_node_insert($node) {
     }
     $sitename = $node->field_hostname['und'][0]['value'];
     #dpm($sitename);
-    if (! mkdir($sitesdir . '/' . $sitename, 0775) ) {
-      drupal_set_message("Server folder $sitesdir/$sitename could not be created.");
+    if (! file_exists($sitesdir . '/' . $sitename) ) {
+      if (! mkdir($sitesdir . '/' . $sitename, 0775) ) {
+        drupal_set_message("Server folder $sitesdir/$sitename could not be created.");
+      }
     }
   }
 }

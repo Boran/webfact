@@ -18,20 +18,22 @@ DELIMITER //
 DROP PROCEDURE IF EXISTS CreateAppDB//
 CREATE PROCEDURE CreateAppDB(IN db_name VARCHAR(50), IN db_user VARCHAR(50), IN db_pw VARCHAR(50))
 BEGIN
-    SET @s = CONCAT('CREATE USER ', db_user, ' IDENTIFIED BY ''', db_pw, '''');
+    #SET @s = CONCAT('CREATE USER ', db_user, ' IDENTIFIED BY ''', db_pw, '''');
+    #PREPARE stmt FROM @s;
+    #EXECUTE stmt;
+    #DEALLOCATE PREPARE stmt;
+    # grant will do a create user if needed
+    SET @s = CONCAT('GRANT ALL ON ', db_name, '.* TO ''', db_user, '''@''%''' , ' IDENTIFIED BY ''', db_pw, '''');
     PREPARE stmt FROM @s;
     EXECUTE stmt;
     DEALLOCATE PREPARE stmt;
 
+    # this must be the second statement
     SET @s = CONCAT('CREATE DATABASE ', db_name);
-    PREPARE stmt FROM @s;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
-
-    SET @s = CONCAT('GRANT ALL ON ', db_name, '.* TO ', db_user, '@''%''');
     PREPARE stmt FROM @s;
     EXECUTE stmt;
     DEALLOCATE PREPARE stmt;
 END//
 DELIMITER ;
+grant execute on procedure CreateAppDB to 'webfact_create'@'%';
 

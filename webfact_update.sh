@@ -19,8 +19,15 @@ if [ -d '.git' ] ; then
   git pull
   # todo: if credential are needed, somehow add them to /root/.netrc
 
-  echo "-- git submodule update "
-  git submodule update
+  #more precise control later
+  #echo "-- git submodule update "
+  #git submodule update
+  echo "--"
+  echo "-- pull latest master for webfact_content_type, webfact, webfactapi"
+  cd /var/www/html/sites/all/modules/custom/webfact_content_types && git checkout master >/dev/null 2>&1 && git pull
+  cd /var/www/html/sites/all/modules/custom/webfact && git checkout master >/dev/null 2>&1 && git pull
+  cd /var/www/html/sites/all/modules/custom/webfactapi && git checkout master >/dev/null 2>&1 && git pull
+
 
   echo " "
   echo "-- last two git logs /var/www"

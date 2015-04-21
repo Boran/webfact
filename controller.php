@@ -171,7 +171,8 @@ class WebfactController {
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Manage<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
                   <li><a href="$wpath/advanced/$this->nid">Status</a></li>
-                  <li><a href="$wpath/logs/$this->nid">Logs</a></li>
+                  <li><a href="$wpath/logs/$this->nid">Docker logs</a></li>
+                  <li><a href="$wpath/druplogs/$this->nid">Drupal logs</a></li>
                   <li><a href="$wpath/stop/$this->nid">Stop</a></li>
                   <li><a href="$wpath/start/$this->nid">Start</a></li>
                   <li><a href="$wpath/restart/$this->nid">Restart</a></li>
@@ -1065,6 +1066,13 @@ END;
         return;
       }
 
+      else if ($this->action=='druplogs') {
+        $cmd = "cd /var/www/html && drush ws --count=" . variable_get('webfact_druplogs_count', 200);
+        $logs = $this->runCommand($cmd);
+        $this->markup = "<h3>Results</h3> $cmd:<pre>$logs</pre>";   // show output
+        return;
+      }
+
       else if ($this->action=='logs') {
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
@@ -1589,6 +1597,7 @@ dpm('coosupdate done');
         case 'coappupdate':
         case 'coosupdate':
         case 'coget':
+        case 'druplogs':
         case 'logs':
         case 'processes':
         case 'logtail':
@@ -1732,6 +1741,7 @@ dpm('coosupdate done');
         break;
 
       #case 'coget':
+      case 'druplogs':
       case 'logs':
       case 'deleteall':
       case 'processes':

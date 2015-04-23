@@ -22,6 +22,9 @@ if [ -d '.git' ] ; then
   #more precise control later
   #echo "-- git submodule update "
   #git submodule update
+  git submodule init profiles/webfactp
+  git submodule update profiles/webfactp
+
   echo "--"
   echo "-- pull latest master for webfact_content_type, webfact, webfactapi"
   cd /var/www/html/sites/all/modules/custom/webfact_content_types && git checkout master >/dev/null 2>&1 && git pull

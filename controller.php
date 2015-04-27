@@ -550,10 +550,10 @@ END;
     }
     #dpm($this->restartpolicy);
 
-    # Docker 1.6 does not allow duplicate in bindings
+    # Docker 1.6 does not allow duplicates in bindings
     $this->docker_start_vol = array_unique($this->docker_start_vol);
     $this->docker_vol = array_unique($this->docker_vol);
-    $this->docker_ports = array_unique($this->docker_ports); # just in case
+    //$this->docker_ports = array_unique($this->docker_ports); # just in case
 
     if (empty($this->docker_start_vol)) {  // API will not accept an empty Bind
       $this->startconfig = [

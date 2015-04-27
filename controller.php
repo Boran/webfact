@@ -550,7 +550,11 @@ END;
     }
     #dpm($this->restartpolicy);
 
-    #dpm($this->docker_start_vol);
+    # Docker 1.6 does not allow duplicate in bindings
+    $this->docker_start_vol = array_unique($this->docker_start_vol);
+    $this->docker_vol = array_unique($this->docker_vol);
+    $this->docker_ports = array_unique($this->docker_ports); # just in case
+
     if (empty($this->docker_start_vol)) {  // API will not accept an empty Bind
       $this->startconfig = [
         'RestartPolicy'=> [ 'MaximumRetryCount'=>3, 'Name'=> $this->restartpolicy ],
@@ -564,10 +568,11 @@ END;
       ];
     }
 
-    #dpm($this->docker_ports);
-    #dpm($this->startconfig);
+    #dpm($this->docker_start_vol);
     #dpm($this->docker_vol);
     #dpm($this->docker_env);
+    #dpm($this->docker_ports);
+    #dpm($this->startconfig);
 
   }  // function
 

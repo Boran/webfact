@@ -1810,7 +1810,7 @@ dpm('coosupdate done');
 
       case 'advanced':  // just drop through to menu below
         // two ways of updating the status regularly
-        // a) browser refresh every XX secs
+        // a) browser refresh every yy secs
           #$meta_refresh = array(    // refresh status every minute
           # '#type' => 'html_tag', '#tag' => 'meta',
           # '#attributes' => array( 'content' =>  '60', 'http-equiv' => 'refresh',));
@@ -1920,10 +1920,14 @@ dpm('coosupdate done');
             $imrepo=$str;
             $imtag='latest';  // presume there is no tag
           }
-          $this->markup .= "Container $this->id is based on image $imrepo tag:$imtag, pulling that from https://hub.docker.com/\n";
-          $imagemgr = $this->getImageManager();
-          $image=$imagemgr->pull($imrepo, $imtag, $pull_callback);
+        } else {
+          // no container yet, so use meta data
+          $imrepo=$this->cont_image;   
+          $imtag='latest';  // presume there is no tag
         }
+        $this->markup .= "Container $this->id is based on image $imrepo tag:$imtag, pulling from https://hub.docker.com/\n";
+        $imagemgr = $this->getImageManager();
+        $image=$imagemgr->pull($imrepo, $imtag, $pull_callback);
         $this->message("pull image $imrepo tag:$imtag");
         $this->markup .= '</pre>';
         break;       // impull

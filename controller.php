@@ -24,6 +24,7 @@ class WebfactController {
   protected $config, $user, $website, $des, $category;
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $dserver, $fserver, $loglines, $env_server; // settings
+  protected $is_drupal; // is this a drupal container: enable drupal features
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
   protected $actual_restart, $actual_error, $actual_status, $actual_buildstatus;
 
@@ -42,6 +43,7 @@ class WebfactController {
     $this->category = 'none';
     $this->docker_ports = array();
     $this->fqdn = '';
+    $this->is_drupal = 0;
 
     # Load configuration defaults, override in settings.php or on admin/config/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
@@ -153,6 +155,21 @@ class WebfactController {
     $rebuild_src_msg = "Backup, stop, delete and recreate " . $this->website->title .". Data in the container will be lost! Are you sure?";
     $rebuild_meta_msg = "Backup, stop, delete and recreate from that same backup. i.e. to rebuild after changing an environment setting. Are you sure?";
 
+    // drupal specific menus
+    if ($this->is_drupal==1) {  // enable drupal menus
+      $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
+      $coappupdate = <<<END
+        <li class="divider"></li>
+        <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
+        <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup, stop, rename the container create a new container and finally restore /var/www/html/sites. Any other local changes wil be lost (e.g. local DB). Continue?')">Run container OS update</a></li>
+END;
+      $createui = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
+
+    } else {   // non-drupal container
+      $drupal_logs= $coappupdate= $coappupdate='';
+      $createui = "<li><a href=$wpath/create/$this->nid>Create</a></li>";
+    }
+
     $nav1 = <<<END
       <nav class="navbar navbar-default">
         <div class="container-fluid">
@@ -172,12 +189,12 @@ class WebfactController {
                 <ul class="dropdown-menu" role="menu">
                   <li><a href="$wpath/advanced/$this->nid">Status</a></li>
                   <li><a href="$wpath/logs/$this->nid">Docker logs</a></li>
-                  <li><a href="$wpath/druplogs/$this->nid">Drupal logs</a></li>
+                  $drupal_logs
                   <li><a href="$wpath/stop/$this->nid">Stop</a></li>
                   <li><a href="$wpath/start/$this->nid">Start</a></li>
                   <li><a href="$wpath/restart/$this->nid">Restart</a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/createui/$this->nid">Create</a></li>
+                  $createui
                   <li class="divider"></li>
                   <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Are you sure?')">Delete container</a></li>
                   <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Are you sure?')">Delete container+meta data</a></li>
@@ -192,9 +209,7 @@ class WebfactController {
                 <ul class="dropdown-menu" role="menu">
                   <li><a href="$wpath/inspect/$this->nid">Inspect</a></li>
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
-                  <li class="divider"></li>
-                  <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
-                  <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup, stop, rename the container create a new container and finally restore /var/www/html/sites. Any other local changes wil be lost (e.g. local DB). Continue?')">Run container OS update</a></li>
+                  $coappupdate
                   <li class="divider"></li>
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild from sources</a></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
@@ -553,7 +568,11 @@ END;
     # Docker 1.6 does not allow duplicates in bindings
     $this->docker_start_vol = array_unique($this->docker_start_vol);
     $this->docker_vol = array_unique($this->docker_vol);
-    //$this->docker_ports = array_unique($this->docker_ports); # just in case
+
+    // detect if this is a drupal container, so we can enable drupal specific management
+    if ( strpos($this->cont_image, 'drupal') ) {
+      $this->is_drupal = 1;
+    }
 
     if (empty($this->docker_start_vol)) {  // API will not accept an empty Bind
       $this->startconfig = [
@@ -1325,9 +1344,9 @@ dpm('coosupdate done');
 
         // Rebuilding via batch API
         watchdog('webfact', "rebuild batch- backup, stop, delete, create from sources", WATCHDOG_NOTICE);
-        // todo: onlky backup if (variable_get('webfact_rebuild_backups', 1) == 1 ) {
-        $batch = array(
-          'title' => t('Rebuilding from sources'),
+        if ($this->is_drupal == 1) {
+          $batch = array(
+          'title' => t('Rebuilding Drupal website from sources'),
           #'init_message' => t('Rebuild starting.'),
           'operations' => array(
             array('batchSaveCont', array($this->website->nid, $this->id)),
@@ -1347,10 +1366,23 @@ dpm('coosupdate done');
             array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)), // 2min
             array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
             array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
-          ),
-          'finished' => 'batchRebuildDone',
-          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
-        );
+            ),
+            'finished' => 'batchRebuildDone',
+            'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+          );
+
+        } else {  // non-drupal, wait less
+          $batch = array(
+          'title' => t('Rebuilding from sources'),
+          'operations' => array(
+            array('batchSaveCont', array($this->website->nid, $this->id)),
+            array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
+            array('batchCreateCont', array($this->website->nid, $this->id)),
+            ),
+            'finished' => 'batchDone',
+            'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+          );
+        }
         batch_set($batch);
         batch_process('website/advanced/' . $this->website->nid); // go here when done
         return;
@@ -1393,7 +1425,6 @@ dpm('coosupdate done');
 
         // create the container
         $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
-                   'Env'  => $this->docker_env, 'Volumes'  => $this->docker_vol
 
         ];
         #dpm($config);

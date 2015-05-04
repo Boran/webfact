@@ -570,7 +570,14 @@ END;
     $this->docker_vol = array_unique($this->docker_vol);
 
     // detect if this is a drupal container, so we can enable drupal specific management
-    if ( strpos($this->cont_image, 'drupal') ) {
+    // the login is a bit inverted to allow seamless use on existing installations,
+    // if the field is not set, or does not exist, presume it is a drupal website
+    if ((isset($this->website->field_not_drupal)) 
+      && !empty($this->website->field_not_drupal)
+      && ($this->website->field_not_drupal['und'][0]['value']==1) ) {
+      $this->is_drupal = 0;
+    } 
+    else {
       $this->is_drupal = 1;
     }
 

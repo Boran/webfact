@@ -25,6 +25,7 @@ class WebfactController {
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $dserver, $fserver, $loglines, $env_server; // settings
   protected $is_drupal; // is this a drupal container: enable drupal features
+  protected $done_per;  // status value back from a drupal container when build is finished
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
   protected $actual_restart, $actual_error, $actual_status, $actual_buildstatus;
 
@@ -43,7 +44,8 @@ class WebfactController {
     $this->category = 'none';
     $this->docker_ports = array();
     $this->fqdn = '';
-    $this->is_drupal = 0;
+    $this->is_drupal = 1;
+    $this->done_per = 100;
 
     # Load configuration defaults, override in settings.php or on admin/config/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
@@ -570,15 +572,18 @@ END;
     $this->docker_vol = array_unique($this->docker_vol);
 
     // detect if this is a drupal container, so we can enable drupal specific management
-    // the login is a bit inverted to allow seamless use on existing installations,
+    // the logic is a bit inverted to allow seamless use on existing installations,
     // if the field is not set, or does not exist, presume it is a drupal website
     if ((isset($this->website->field_not_drupal)) 
       && !empty($this->website->field_not_drupal)
       && ($this->website->field_not_drupal['und'][0]['value']==1) ) {
       $this->is_drupal = 0;
     } 
-    else {
-      $this->is_drupal = 1;
+
+    // todo: customer feature, how to generalise?
+    // build is normally done at 100%, but 200% in this case
+    if ($this->cont_image == 'inno/drupal') {
+      $this->done_per = 200;
     }
 
     if (empty($this->docker_start_vol)) {  // API will not accept an empty Bind
@@ -1212,9 +1217,9 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
             array('batchTrack', array($this->website->nid, $this->id, 5)),
             array('batchTrack', array($this->website->nid, $this->id, 10)),
             array('batchTrack', array($this->website->nid, $this->id, 20)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)), // 2min
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)), // 2min
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
             # restore files from /data/html_sites.tgz
             array('batchCommandCont', array("cd /var/www/html && mv sites sites.$$ && tar xzf /data/html_sites.tgz", $this->id)),
             array('batchContLog', array($this->website->nid, $this->id, variable_get('webfact_cont_log', '/tmp/webfact.log'))),
@@ -1360,19 +1365,19 @@ dpm('coosupdate done');
             array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
             // repeat until hopefuly 100% reached
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 20)),
-            array('batchTrack', array($this->website->nid, $this->id, 20)),
-            array('batchTrack', array($this->website->nid, $this->id, 20)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 20, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 20, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 20, $this->done_per)),
             // loop until hopefuly 100% reached
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)), // 2min
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)), // 2min
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
             ),
             'finished' => 'batchRebuildDone',
             'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
@@ -1403,12 +1408,12 @@ dpm('coosupdate done');
           'operations' => array(
             array('batchCreateCont', array($this->website->nid, $this->id)),
             // loop for 3 mins until hopefuly 100% reached
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
 
             #array('batchTrack', array($this->website->nid, $this->id, 20)),
             #array('batchTrack', array($this->website->nid, $this->id, 20)),
@@ -1432,7 +1437,7 @@ dpm('coosupdate done');
 
         // create the container
         $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
-
+                   'Env'  => $this->docker_env, 'Volumes'  => $this->docker_vol
         ];
         #dpm($config);
         $container= new Docker\Container($config);

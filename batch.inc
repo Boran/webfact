@@ -136,7 +136,7 @@ function batchContLog($nid, $id, $logfile, &$context) {
 /*
  * tracking progress
  */
-function batchTrack($nid, $id, $timer, &$context) {
+function batchTrack($nid, $id, $timer, $done, &$context) {
   if ( isset($context['results']['done']) ) {
     #watchdog('webfact', "batchTrack ignore since results=done");
     $context['finished'] = 1;
@@ -147,7 +147,8 @@ function batchTrack($nid, $id, $timer, &$context) {
   $result = $w->getContainerBuildStatus($nid);
   watchdog('webfact', "batchTrack nid=$nid, $id, build status=$result");
   #if ( ($result==100) || ($result==200) ) {
-  if ( $result == variable_get('webfact_build_done_value', 200) ) {
+  //if ( $result == variable_get('webfact_build_done_value', 200) ) {
+  if ( $result == $done ) {
     // already done, jump back asap
     $context['results']['buildstatus'] = $result;
     $context['results']['done'] = true; // flag: no further processing
@@ -167,7 +168,7 @@ function batchTrack($nid, $id, $timer, &$context) {
   $context['finished'] = 1;
 }
 
-function batchWaitInstalled($nid, $title, $timer, $count, &$context) {
+function batchWaitInstalled($nid, $title, $timer, $count, $done, &$context) {
   if ( isset($context['results']['done']) ) {
     #watchdog('webfact', "batchWaitInstalled ignore since results=done");
     $context['finished'] = 1;
@@ -178,7 +179,8 @@ function batchWaitInstalled($nid, $title, $timer, $count, &$context) {
   for ($i = 0; $i < $count; $i++) {   // max 100 secs, to avoid browser timeout
     $result = $w->getContainerBuildStatus($nid);
     watchdog('webfact', "batchWaitInstalled $i nid=$nid, $title, build status=$result");
-    if ( $result == variable_get('webfact_build_done_value', 200) ) {
+    //if ( $result == variable_get('webfact_build_done_value', 200) ) {
+    if ( $result == $done ) {
       $context['results']['log'][] = date("H:i:s") . " $result";
       $context['results']['done'] = true; // flag: no further procesing
       // done, jump back asap
@@ -209,7 +211,7 @@ function batchRebuildDone($success, $results, $operations) {
     # if ($results['buildstatus']==100 || $results['buildstatus']==200) {
       $message = t('Container created, you can visit the new website');
     } else {
-      $message = t('Container created, installation is going on in the background. Follow the Build Status below to completion, or visit the logs page for details.');
+      $message = t('Container created, installation may still be running in the background. Follow the Build Status below, or visit the logs page.');
     }
   }
   else {

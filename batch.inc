@@ -33,7 +33,7 @@ function batchRemoveCont($nid, $title, $log=1, &$context) {
   $context['finished'] = 0;
   watchdog('webfact', "batchRemoveCont $nid, $title");
   $w= new WebfactController;
-  $w->deleteContainer($title);
+  $w->deleteContainer($nid, $title);
   if ($log==1) {
     $context['results']['log'][] = 'deleted ' . check_plain($title);
   }

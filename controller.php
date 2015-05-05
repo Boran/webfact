@@ -285,10 +285,10 @@ END;
 
   /*
    * stop or delete a container by name
-   * no checking of permissions,
    * todo: this is an experimental abstraction, initially used in hook_node_delete()
+   * no checking of permissions,
    */
-  public function deleteContainer($name) {
+  public function deleteContainer($nid, $name) {
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
      if (!$container) {
@@ -299,6 +299,9 @@ END;
        $manager->stop($container);
      }
      $manager->remove($container);
+     $this->nid = $nid;  // needed for extdb()
+     $this->id = $name;  // needed for extdb()
+     $this->extdb('delete', 0);    // delete external db, if configured
      watchdog('webfact', "deleteContainer $name - removed");
   }
 
@@ -366,7 +369,7 @@ END;
      // todo: make sure $id and all "this" stuff is loaded
      $manager = $this->getContainerManager();
 
-     $this->createDB($verbose);   // if an external DB is needed
+     $this->extdb('create', $verbose);  // if an an external DB is needed
 
      // create the container
         $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
@@ -795,16 +798,25 @@ END;
 
 
   /*
-   * createDB()
+   * extdb()
    * the website database can be external, as opposed to being inside the container.
-   * When inside theconatainer, the boran/drupal image takes care of db creation, but if
-   * external, webfact need to create a new database
+   * When inside the conatainer, the boran/drupal image takes care of db creation, but if
+   * external, webfact needs to create a new database
    * params: new DB and user name, verbose messages.
    */
-  private function createDB($verbose=1) {
+  private function extdb($action='create', $verbose=1) {
     if (variable_get('webfact_manage_db',0) == 0) {
       return 1;    // do not manage DB
     }
+    if (! isset($this->id) ) {
+      watchdog('webfact', 'extdb ' . $action . ': Error: no website name set');
+      return 1;  
+    }
+    if (! isset($this->nid) ) {
+      watchdog('webfact', 'extdb ' . $action . ': Error: no website nid set');
+      return 1;  
+    }
+
    
     // naming convertion for DB & usernames: add a prefix to avoid mysql restrictions
     $newuser = 'u_' . $this->id;
@@ -813,22 +825,22 @@ END;
     }
     $newdb = 'd_' . $this->id; 
 
-    watchdog('webfact', 'Creating new database and writing mysql settings to the docker env field for ' . $newdb);
+    watchdog('webfact', $action . ' database and write mysql settings to the docker env field for ' . $newdb);
     $mysqlhost=variable_get('webfact_manage_db_host');
     $mysqluser=variable_get('webfact_manage_db_user');
     $mysqlpw=variable_get('webfact_manage_db_pw');
 
     $this->website = node_load($this->nid);
     if ($this->website==null) {
-      $this->message("createDB: node $this->nid not found", 'error');
+      $this->message("extdb: node $this->nid not found", 'error');
       return;
     }
-    // get current mysql password, if thee is one from the website node
+    // get current mysql password, if there is one, from the website node
     if (!empty($this->website->field_docker_environment['und']) ) {
       foreach ($this->website->field_docker_environment['und'] as $row) {
         if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
           $pw=$matches[1];   // override default
-          watchdog('webfact', 'createDB() use existing password');
+          watchdog('webfact', 'use existing mysql password');
         }
       }
     } else {
@@ -842,14 +854,27 @@ END;
         #trigger_error('Database connection failed: '  . $conn->connect_error, E_USER_ERROR);
         $this->message("Cannot connect to database (host=$mysqlhost, user=$mysqluser)", 'error');
       }
-      watchdog('webfact', "Cannot connect to database (host=$mysqlhost, user=$mysqluser)", array(), WATCHDOG_ERROR);
+      watchdog('webfact', "extdb: Cannot connect to database (host=$mysqlhost, user=$mysqluser)", array(), WATCHDOG_ERROR);
       return 0;
     }
-    if (!$conn->query("call CreateAppDB('$newdb', '$newuser', '$pw')")) {
-      if ($verbose==1) {
-        $this->message($conn->error, 'warning');
+
+    // actually create/delete the DB
+    if ($action == 'create') {
+      if (!$conn->query("call CreateAppDB('$newdb', '$newuser', '$pw')")) {
+        if ($verbose==1) {
+          $this->message($conn->error, 'warning');
+        }
+        watchdog('webfact', 'CreateAppDB: ' . $conn->error, array(), WATCHDOG_ERROR);
       }
-      watchdog('webfact', 'CreateAppDB: ' . $conn->error, array(), WATCHDOG_ERROR);
+    } else if ($action == 'delete') {
+      $cmd="call DeleteAppDB ('$newdb', '$newuser')";
+      if (!$conn->query($cmd)) {
+        if ($verbose==1) {
+          $this->message($conn->error, 'warning');
+        }
+        watchdog('webfact', "extdb: delete db ($cmd): " . $conn->error, array(), WATCHDOG_ERROR);
+      }
+      watchdog('webfact', "extdb: deleted db $newdb, user $newuser");
     }
     
     // save the mysql values to the node
@@ -1414,13 +1439,6 @@ dpm('coosupdate done');
             array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
             array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
             array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
-
-            #array('batchTrack', array($this->website->nid, $this->id, 20)),
-            #array('batchTrack', array($this->website->nid, $this->id, 20)),
-            #array('batchTrack', array($this->website->nid, $this->id, 20)),
-
-            #array('batchTrack', array($this->website->nid, $this->id, 20)),
-            #array('batchTrack', array($this->website->nid, $this->id, 20)),
             #array('batchTrack', array($this->website->nid, $this->id, 20)),
           ),
           'finished' => 'batchRebuildDone',
@@ -1428,11 +1446,10 @@ dpm('coosupdate done');
         );
         batch_set($batch);
         batch_process('website/advanced/' . $this->website->nid); // go here when done
-
       }
 
       else if ($this->action=='create') {
-        $this->createDB($verbose);  // if an an external DB is needed
+        $this->extdb('create', $verbose);  // if an an external DB is needed
         // todo: abort here if return=false?
 
         // create the container

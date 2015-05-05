@@ -34,6 +34,24 @@ BEGIN
     EXECUTE stmt;
     DEALLOCATE PREPARE stmt;
 END//
+
+DROP PROCEDURE IF EXISTS DeleteAppDB//
+CREATE PROCEDURE DeleteAppDB(IN db_name VARCHAR(50), IN db_user VARCHAR(50))
+BEGIN
+    #SET @s = CONCAT('DROP USER ', db_user, '''@''%''' );
+    SET @s = CONCAT('DROP USER ', db_user);
+    PREPARE stmt FROM @s;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+
+    # this must be the second statement
+    SET @s = CONCAT('DROP DATABASE ', db_name);
+    PREPARE stmt FROM @s;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END//
+
 DELIMITER ;
 grant execute on procedure CreateAppDB to 'webfact_create'@'%';
+grant execute on procedure DeleteAppDB to 'webfact_create'@'%';
 

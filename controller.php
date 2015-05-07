@@ -216,6 +216,7 @@ END;
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild from sources</a></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
                   <li class="divider"></li>
+                  <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
       <!--        <li><a href="$wpath/couploadfile/$this->nid">File Upload</a></li>   -->
                 </ul>
@@ -424,7 +425,7 @@ END;
     }
     // Create a '/data' volume by default?
     if (variable_get('webfact_data_volume', 1) == 1 ) {
-      $this->docker_vol[] = "/data =>{}";
+      $this->docker_vol[] = "/data =>{}"; // todo: make a setting?
       $this->docker_start_vol[] = variable_get('webfact_server_sitesdir', '/opt/sites/') 
         . $this->id . ":/data:rw";
     }
@@ -1676,6 +1677,7 @@ dpm('coosupdate done');
         case 'cogetfile':
         case 'cocmd':
         case 'cocopyfile':
+        case 'corename':
         case 'couploadfile':
           // get the node and find the container name
           $this->website = node_load($this->nid);
@@ -2187,6 +2189,74 @@ END;
         #$result=$manager->execstart($execid);
 */
 //TODO
+        break;
+
+
+      case 'corename':     // Rename a container
+        $html = <<<END
+<!-- Bootstrap: -->
+<form >
+<fieldset>
+<legend>Change the name of a container</legend>
+<p>The docker container and metadata hostname will be renamed and the server /data mount-point moved. However:<p>
+<ul>
+<li>The hostname within the container is not renamed (e.g. may affect outgoing emails, website headers, etc.)</li>
+<li>External databases (if used) are not renamed </li>
+<li>Docker environment variables such AS VIRTUAL_HOST are unchanged. So, for example, the Nginx reverse proxy will not be able to map to the container web port. To fix VIRTUAL_HOST, do a 'Rebuild from meta data' after renaming (note that the docker image for the container will then be image made before the rebuild, not the original image).</p>
+<!-- Button -->
+<div class="col-xs-2">
+  <div class="control-group">
+    <div class="controls">
+      <button id="submit" name="submit" class="btn btn-default">Rename</button>
+    </div>
+  </div>
+</div>
+<!-- Text input-->
+<div class="col-xs-10">
+  <div class="control-group">
+    <div class="controls">
+      <input id="textinput-0" name="newname" type="text" placeholder="" class="input-xxlarge">
+      <p class="help-block">New name  for the container, and hence the Website URL. e.g. a-z0-9 'mysite4'</p>
+    </div>
+  </div>
+</div>
+</fieldset>
+</form>
+END;
+        $this->markup .= $html;
+        $_url = drupal_parse_url($_SERVER['REQUEST_URI']);
+        if (! isset ($_url['query']['newname']) ) {
+          break;
+        }
+        #dpm($_url['query']);
+        $newname = check_plain($_url['query']['newname']);   // security
+        $newname = preg_replace('/[^A-Za-z0-9]/', '', strtolower($newname));
+        $container = $manager->find($this->id);
+        if (! $container) {
+          $this->message("$this->id does not exist");
+          break;
+        }
+        watchdog('webfact', "corename: Rename container and meta hostname from $this->id to $newname");
+        # a) rename container
+        $this->renameContainer($this->id, $newname);
+        # b) rename metadata
+        $this->website->field_hostname['und'][0]['value'] = $newname;
+        node_save($this->website);     // Save the updated node
+        $this->website=node_load($this->website->nid);  # reload cache
+        # c) Rename server folder
+        $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
+	$olddir = $sitesdir . $this->id;
+	$newdir = $sitesdir . $newname;
+        if ( file_exists($olddir) && is_writable($olddir) ) {
+	  drupal_set_message("Rename server folder (for container /data mount) $olddir renamed to $newdir");
+	  if ( rename($olddir, $newdir) ) {
+            watchdog('webfact', "corename: renamed $olddir renamed to $newdir");
+	  }
+        } else {
+          watchdog('webfact', "corename: warning $olddir does not exist or was not writeable");
+        }
+        $this->message("done");
+        drupal_goto("/website/advanced/$this->nid"); // show new status
         break;
 
 

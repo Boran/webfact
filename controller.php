@@ -1143,7 +1143,9 @@ END;
           // refresh every 5 secs
           $meta_refresh = array(
             '#type' => 'html_tag', '#tag' => 'meta',
-            '#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',));
+            #'#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',)
+            '#attributes' => array( 'content' => variable_get('webfact_log_refresh', '30'), 'http-equiv' => 'refresh',)
+          );
           drupal_add_html_head($meta_refresh, 'meta_refresh');
 
           //                               $follow $stdout $stderr $timestamp $tail = "all"

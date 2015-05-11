@@ -270,6 +270,14 @@ function webfact_admin_settings() {
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
+  $form['webfact_fieldset_UI']['webfact_log_refresh'] = array(
+    '#title' => t('Refresh delay (secs) for the container log UI'),
+    '#default_value' => variable_get('webfact_log_refresh', array('')),
+    '#description' => t('default 30'),
+    '#type' => 'textfield',
+    '#size' => 10,
+    '#maxlength' => 10,
+  );
 
 
   return system_settings_form($form);

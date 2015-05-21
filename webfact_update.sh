@@ -38,8 +38,8 @@ if [ -d '.git' ] ; then
 else
   echo "-- no git repo in /var/www/html";
   echo "-- git pull for webfact components: module, theme, webfact_content_types, webfactapi:"
+  (cd sites/all/themes/custom/webfact_theme  && git pull origin master)
   (cd sites/all/modules/custom/webfact       && git pull origin master)
-  (cd sites/all/themes/custoom/webfact_theme && git pull origin master)
   (cd sites/all/modules/custom/webfactapi    && git pull origin master)
   (cd sites/all/modules/custom/webfact_content_types/ && git pull origin master)
 fi

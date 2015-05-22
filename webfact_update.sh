@@ -9,6 +9,12 @@
 
 echo "___________ `date '+%Y-%m-%d %H:%M'` _________________";
 echo "Running webfact_update.sh: updating elements of a Webfactory UI";
+
+# load proxy settings, if any
+if [ -f '/etc/profile.d/proxy.sh' ] ; then
+  . /etc/profile.d/proxy.sh
+fi
+
 cd /var/www/html
 if [ -d '.git' ] ; then
   if [ -x /root/backup.sh ] ; then
@@ -50,7 +56,7 @@ echo "Note: if webfact_content_types changed, please re-apply the feature manual
 # finally:
 echo " "
 echo "-- Drush update, clear caches"
-drush updatedb
+drush -y updatedb
 drush cache-clear all
 echo "-- `date '+%Y-%m-%d %H:%M'` webfact_update.sh done --"
 

@@ -1154,7 +1154,7 @@ END;
 //       tried lots of stuff, more thinking needed, maybe it needs to be done in the docker-php library
 //dpm($logs);
           foreach ($logs as $log) {
-            //$this->markup .= $log['output'];
+            $this->markup .= $log['output'];
             //$this->markup .= preg_replace("/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]/", "", $log['output']);
             //$this->markup .= preg_replace("/[^a-zA-Z0-9_ %\[\]\.\(\)%&-\s]/", "", $log['output']);
             //$this->markup .= preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $log['output']);

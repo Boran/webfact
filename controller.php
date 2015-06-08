@@ -1140,20 +1140,34 @@ END;
           $this->message("$this->id does not exist", 'warning');
         }
         else {
-          // refresh every 5 secs
+          // refresh every XX secs
           $meta_refresh = array(
             '#type' => 'html_tag', '#tag' => 'meta',
-            #'#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',)
             '#attributes' => array( 'content' => variable_get('webfact_log_refresh', '30'), 'http-equiv' => 'refresh',)
           );
           drupal_add_html_head($meta_refresh, 'meta_refresh');
 
           //                               $follow $stdout $stderr $timestamp $tail = "all"
           $logs=$manager->logs($container, false, true, true, false, $this->loglines);
-          //$logs=$manager->logs($container, true, true, true, false, $this->loglines);
           $this->markup = '<pre>';
+// todo: string control and funny characters from the logs
+//       tried lots of stuff, more thinking needed, maybe it needs to be done in the docker-php library
+//dpm($logs);
           foreach ($logs as $log) {
-            $this->markup .= $log['output'];
+            //$this->markup .= $log['output'];
+            //$this->markup .= preg_replace("/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]/", "", $log['output']);
+            //$this->markup .= preg_replace("/[^a-zA-Z0-9_ %\[\]\.\(\)%&-\s]/", "", $log['output']);
+            //$this->markup .= preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $log['output']);
+            //$this->markup .= preg_replace('/[\x00-\x08\x0B-\x1F]/', '', $log['output']);
+            //$this->markup .= preg_replace('/[^[:print:]\n\r]/', '', $log['output']);
+            //$this->markup .= preg_replace('/[^[:print:]/', '', $log['output']);
+/*
+$output = $log['output'];
+  $output = preg_replace("/\x1B\[31;40m(.*?)(\x1B\[0m)/", '<span style="color: red">$1</span>$2', $output);
+  $output = preg_replace("/\x1B\[1m(.*?)(\x1B\[0m)/", '<b>$1</b>$2', $output);
+  $output = preg_replace("/\x1B\[0m/", '', $output);
+$this->markup .= $output;
+*/
           }
           $this->markup .= '</pre>';
         }

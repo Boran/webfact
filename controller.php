@@ -620,7 +620,7 @@ END;
    *  container name/id
    *  max number of bytes to read from the result
    */
-  public function runCommand($cmd, $id='', $maxlength=4096, $verbose=0) {
+  public function runCommand($cmd, $id='', $maxlength=8192, $verbose=0) {
     if (strlen($id)<1) {
       $id = $this->id;
     }
@@ -1843,8 +1843,12 @@ dpm('coosupdate done');
         break;
 
       case 'proxyconf':
-        $cmd = 'cat ' . variable_get('webfact_rproxy_conf', '/etc/nginx/conf.d/default.conf');
-        $log = $this->runCommand($cmd, $this->rproxy, variable_get('webfact_rproxy_confsize', 50000)); 
+        #$cmd = 'cat ' . variable_get('webfact_rproxy_conf', '/etc/nginx/conf.d/default.conf');
+        # remove empty lines:
+        $cmd = 'egrep -v \'^\s*$\' ' . variable_get('webfact_rproxy_conf', '/etc/nginx/conf.d/default.conf');
+        $log = $this->runCommand($cmd, $this->rproxy, variable_get('webfact_rproxy_confsize', 500000)); 
+#YY
+        #$log = $this->runCommand($cmd, $this->rproxy, 500000); 
         $this->markup = '<pre>' . $cmd . '<br>__________<br>' . $log . '</pre>';
         break;
 

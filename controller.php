@@ -103,7 +103,7 @@ class WebfactController {
 
 
   /*
-   * helper function. hack drupal file_transer() to set caching headers
+   * helper function. hack drupal file_transfer() to set caching headers
    * and not call drupal exit.
    * https://api.drupal.org/api/drupal/includes%21file.inc/function/file_transfer/7
    */
@@ -410,24 +410,46 @@ END;
     $this->docker_vol=array();
     $this->docker_env=array();
 
+    // detect if this is a drupal container, so we can enable drupal specific management
+    // the logic is a bit inverted to allow seamless use on existing installations,
+    // if the field is not set, or does not exist, presume it is a drupal website
+    if ((isset($this->website->field_not_drupal)) 
+      && !empty($this->website->field_not_drupal)
+      && ($this->website->field_not_drupal['und'][0]['value']==1) ) {
+      $this->is_drupal = 0;
+    } 
+
     // Initial docker environment variables
+
     // todo: should only be for Drupal sites?
     $this->fqdn = $this->id . '.' . $this->fserver;  // e.g. MYHOST.webfact.example.ch
-    $this->docker_env = [
-      'DRUPAL_SITE_NAME='   . $this->website->title,
-      'DRUPAL_SITE_EMAIL='  . $this->website->field_site_email['und'][0]['safe_value'],
-      'DRUPAL_ADMIN_EMAIL=' . $this->website->field_site_email['und'][0]['safe_value'],
-      "VIRTUAL_HOST=$this->fqdn",
-    ];
+
+    if ($this->is_drupal == 1) {
+      $this->docker_env = [
+        'DRUPAL_SITE_NAME='   . $this->website->title,
+        'DRUPAL_SITE_EMAIL='  . $this->website->field_site_email['und'][0]['safe_value'],
+        'DRUPAL_ADMIN_EMAIL=' . $this->website->field_site_email['und'][0]['safe_value'],
+        "VIRTUAL_HOST=$this->fqdn",
+      ];
+    } else {
+      #dpm('-not drupal');
+      $this->docker_env = [
+        "VIRTUAL_HOST=$this->fqdn",
+      ];
+    }
+
     // webfactory server default
     if (isset($this->env_server)) {     // pull in default env
       $this->docker_env[] = $this->env_server;
     }
     // Create a '/data' volume by default?
-    if (variable_get('webfact_data_volume', 1) == 1 ) {
-      $this->docker_vol[] = "/data =>{}"; // todo: make a setting?
-      $this->docker_start_vol[] = variable_get('webfact_server_sitesdir', '/opt/sites/') 
-        . $this->id . ":/data:rw";
+    if ($this->is_drupal==1) { 
+      if (variable_get('webfact_data_volume', 1) == 1 ) {
+        #$this->docker_vol[] = "/data =>{}"; // todo: make a setting?
+        $this->docker_vol[] = [ '/data' => array() ]; // todo: make a setting?
+        $this->docker_start_vol[] = variable_get('webfact_server_sitesdir', '/opt/sites/') 
+          . $this->id . ":/data:rw";
+      }
     }
 
     // Template? : Load values there first
@@ -464,7 +486,9 @@ END;
                 #dpm($matches);
                 if (isset($matches[1])) {
                   # $this->docker_vol = ["/root/gitwrap/id_rsa" =>"{}", "/root/gitwrap/id_rsa.pub" =>"{}" ];
-                  $this->docker_vol[] .= "$matches[1] =>{}";
+                  //Pre docker 1.7: $this->docker_vol[] .= "$matches[1] =>{}";
+                  $this->docker_vol[$matches[1]] = array();
+
                   # runtime mapping
                   $this->docker_start_vol[] .= $row['safe_value'];
                 }
@@ -532,7 +556,9 @@ END;
           # image "create time" mapping: foo:bar:baz, extract the foo:
           $count = preg_match('/^(.+)\:.+:/', $row['safe_value'], $matches);
           if (isset($matches[1])) {
-            $this->docker_vol[] .= "$matches[1] =>{}";
+            //Pre docker 1.7: $this->docker_vol[] .= "$matches[1] =>{}";
+            $this->docker_vol[$matches[1]] = array();
+
             # runtime mapping
             $this->docker_start_vol[] .= $row['safe_value'];
           }
@@ -575,14 +601,6 @@ END;
     $this->docker_start_vol = array_unique($this->docker_start_vol);
     $this->docker_vol = array_unique($this->docker_vol);
 
-    // detect if this is a drupal container, so we can enable drupal specific management
-    // the logic is a bit inverted to allow seamless use on existing installations,
-    // if the field is not set, or does not exist, presume it is a drupal website
-    if ((isset($this->website->field_not_drupal)) 
-      && !empty($this->website->field_not_drupal)
-      && ($this->website->field_not_drupal['und'][0]['value']==1) ) {
-      $this->is_drupal = 0;
-    } 
 
     // todo: customer feature, how to generalise?
     // build is normally done at 100%, but 200% in this case
@@ -603,9 +621,10 @@ END;
       ];
     }
 
+    #dpm('--load_meta 4---');
+    #dpm($this->docker_env);
     #dpm($this->docker_start_vol);
     #dpm($this->docker_vol);
-    #dpm($this->docker_env);
     #dpm($this->docker_ports);
     #dpm($this->startconfig);
 
@@ -1303,7 +1322,6 @@ dpm('coosupdate done');
 */
 
 // Directly, without batch:
-// XX
         // backup, stop, delete:
         if (variable_get('webfact_rebuild_backups', 1) == 1 ) {
           $savedimage = $this->backupContainer($this->id, "saved before app update on $base_root", '-before-update');
@@ -1456,9 +1474,14 @@ dpm('coosupdate done');
         // todo: abort here if return=false?
 
         // create the container
-        $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
-                   'Env'  => $this->docker_env, 'Volumes'  => $this->docker_vol
+        $config = ['Image'=> $this->cont_image, 
+                   'Hostname' => $this->fqdn,
+                   'Env'  => $this->docker_env, 
+                   //pre docker 1.7: 'Volumes'  => $this->docker_vol
+                   //'Volumes'  => [ '/data' => array() ],
+                   'Volumes'  => $this->docker_vol,
         ];
+        #dpm('--create: config--');
         #dpm($config);
         $container= new Docker\Container($config);
         $container->setName($this->id);
@@ -1469,6 +1492,7 @@ dpm('coosupdate done');
         if ($verbose == 1) {
           $this->message("start ", 'status', 3);
         }
+        #dpm('--create2--');
         #dpm($this->startconfig);
         $manager->start($container, $this->startconfig);
 
@@ -1483,7 +1507,7 @@ dpm('coosupdate done');
           $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
           $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
 
-          // XX: do some ajax to query the build status and confirm when done
+          // TODO: do some ajax to query the build status and confirm when done
           #$this->message("Build=" .$this->getContainerBuildStatus());
           #if ($this->getContainerBuildStatus() == 100) {
           #  $this->message("Build finished");

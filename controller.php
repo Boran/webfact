@@ -446,7 +446,8 @@ END;
     if ($this->is_drupal==1) { 
       if (variable_get('webfact_data_volume', 1) == 1 ) {
         #$this->docker_vol[] = "/data =>{}"; // todo: make a setting?
-        $this->docker_vol[] = [ '/data' => array() ]; // todo: make a setting?
+        //$this->docker_vol[] = [ '/data' => array() ]; // Docker 1.7: array
+        $this->docker_vol['/data'] = array() ; // Docker 1.7: array
         $this->docker_start_vol[] = variable_get('webfact_server_sitesdir', '/opt/sites/') 
           . $this->id . ":/data:rw";
       }
@@ -599,7 +600,7 @@ END;
 
     # Docker 1.6 does not allow duplicates in bindings
     $this->docker_start_vol = array_unique($this->docker_start_vol);
-    $this->docker_vol = array_unique($this->docker_vol);
+    //$this->docker_vol = array_unique($this->docker_vol);
 
 
     // todo: customer feature, how to generalise?
@@ -1447,7 +1448,7 @@ dpm('coosupdate done');
       }
 
 
-      /* batchAPI wrapper arput "create" for progress bar */
+      /* batchAPI wrapper around "create" for progress bar */
       else if ($this->action=='createui') {
         $batch = array(
           'title' => t('Creating ' . $this->id),
@@ -1477,7 +1478,6 @@ dpm('coosupdate done');
         $config = ['Image'=> $this->cont_image, 
                    'Hostname' => $this->fqdn,
                    'Env'  => $this->docker_env, 
-                   //pre docker 1.7: 'Volumes'  => $this->docker_vol
                    //'Volumes'  => [ '/data' => array() ],
                    'Volumes'  => $this->docker_vol,
         ];
@@ -1647,7 +1647,7 @@ dpm('coosupdate done');
    */
   public function arguments($action, $id, $verbose=1) {
     $list=array();
-    #$this->message("arguments $action, $id");
+    #watchdog('webfact', "arguments $action, $id");
     $this->action = $action;  // todo: only allow alpha
     $this->verbose=$verbose;  // todo: remove param, just use setting
 
@@ -1713,7 +1713,7 @@ dpm('coosupdate done');
             drupal_goto('/websites');   // go back to the list, we are lost
             return;
           }
-          if ($this->website->type!='website') {
+          if ((! isset($this->website->type)) || ($this->website->type!='website') ) {
             $this->message("$this->action container: node $this->nid is not a website (it is type $this->website->type)", 'error');
             return;
           }

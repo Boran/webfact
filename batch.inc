@@ -148,7 +148,12 @@ function batchTrack($nid, $id, $timer, $done, &$context) {
   watchdog('webfact', "batchTrack nid=$nid, $id, build status=$result");
   #if ( ($result==100) || ($result==200) ) {
   //if ( $result == variable_get('webfact_build_done_value', 200) ) {
-  if ( $result == $done ) {
+  if ( $result == '' ) {   // something is wrong, abort
+    $context['results']['buildstatus'] = "-1";
+    $context['results']['log'][] = date("H:i:s") . " , error no build status";
+    $context['results']['done'] = true; // flag: no further procesing
+  }
+  else if ( $result == $done ) {
     // already done, jump back asap
     $context['results']['buildstatus'] = $result;
     $context['results']['done'] = true; // flag: no further processing
@@ -180,6 +185,12 @@ function batchWaitInstalled($nid, $title, $timer, $count, $done, &$context) {
     $result = $w->getContainerBuildStatus($nid);
     watchdog('webfact', "batchWaitInstalled $i nid=$nid, $title, build status=$result");
     //if ( $result == variable_get('webfact_build_done_value', 200) ) {
+    if ( $result == '' ) {   // something is wrong, abort
+      $context['results']['log'][] = date("H:i:s") . " , error no build status";
+      $context['results']['done'] = true; // flag: no further procesing
+      // done, jump back asap
+      break;
+    }
     if ( $result == $done ) {
       $context['results']['log'][] = date("H:i:s") . " $result";
       $context['results']['done'] = true; // flag: no further procesing

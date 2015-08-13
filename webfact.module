@@ -53,24 +53,24 @@ function webfact_menu() {
   );  
 
   // entityfieldquery tests
-  $items['bob'] = array(   
-    'page callback'    => 'webfact_bootstrap',
-    'access arguments' => array('access websites'),
-    'type' => MENU_CALLBACK, // no menu
-  );
-  $items['site/%/%'] = array(
-    'page callback'    => 'webfact_bootstrap',
-    'page arguments'   => array(0, 1, 2),
-    'access arguments' => array('access websites'),
-    'type' => MENU_CALLBACK, // no menu
-  );
-  // angular tests
-  $items['webang'] = array(
-    'title'            => 'Angular test',
-    'page callback'    => 'webfact_angular',
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK, // no menu
-  );
+  #$items['bob'] = array(   
+  #  'page callback'    => 'webfact_bootstrap',
+  #  'access arguments' => array('access websites'),
+  #  'type' => MENU_CALLBACK, // no menu
+  #);
+  #$items['site/%/%'] = array(
+  #  'page callback'    => 'webfact_bootstrap',
+  #  'page arguments'   => array(0, 1, 2),
+  #  'access arguments' => array('access websites'),
+  #  'type' => MENU_CALLBACK, // no menu
+  #);
+  #// angular tests
+  #$items['webang'] = array(
+  #  'title'            => 'Angular test',
+  #  'page callback'    => 'webfact_angular',
+  #  'access arguments' => array('access content'),
+  #  'type' => MENU_CALLBACK, // no menu
+  #);
   return $items;
 }
 
@@ -331,6 +331,7 @@ function webfact_arguments($path, $action, $id) {
       path=$path, 1=$action, 2=$id" . '</p>');
   }
 
+  #watchdog('webfact', 'id='. $id . ' action='. $action  );
   $w= new WebfactController;
   //return $w->helloWorldPage();
   return $w->arguments($action, $id);   // send back render array

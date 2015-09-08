@@ -23,7 +23,7 @@ class WebfactController {
   protected $client, $hostname, $nid, $id, $markup, $result, $status, $docker;
   protected $config, $user, $website, $des, $category;
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
-  protected $cont_image, $dserver, $fserver, $loglines, $env_server; // settings
+  protected $cont_image, $cont_mem, $dserver, $fserver, $loglines, $env_server; // settings
   protected $is_drupal; // is this a drupal container: enable drupal features
   protected $done_per;  // status value back from a drupal container when build is finished
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
@@ -55,10 +55,11 @@ class WebfactController {
     $this->rproxy    = variable_get('webfact_rproxy', 'nginx');
     $this->loglines  = variable_get('webfact_loglines', 300);
     $this->restartpolicy = variable_get('webfact_restartpolicy', 'on-failure');
-    $this->env_server  = variable_get('webfact_env_server');
+    $this->env_server = variable_get('webfact_env_server');
     $this->msglevel1 = variable_get('webfact_msglevel1', TRUE);  // normal infos
     $this->msglevel2 = variable_get('webfact_msglevel2', TRUE);  // more
     $this->msglevel3 = variable_get('webfact_msglevel3', TRUE);  // debug
+    $this->cont_mem  = variable_get('webfact_cont_mem', 0);       // default container memory
 
     if (isset($account->name)) {
       $this->user= $account->name;
@@ -410,6 +411,7 @@ END;
     $this->docker_vol=array();
     $this->docker_env=array();
 
+
     // detect if this is a drupal container, so we can enable drupal specific management
     // the logic is a bit inverted to allow seamless use on existing installations,
     // if the field is not set, or does not exist, presume it is a drupal website
@@ -598,12 +600,17 @@ END;
     }
     #dpm($this->restartpolicy);
 
+    if (!empty($this->website->field_memory['und'][0]) ) {
+      $this->cont_mem = $this->website->field_memory['und'][0]['value'] *1024 *1024;
+      #watchdog('webfact', 'Memory=' . $this->cont_mem);
+    }
+
     # Docker 1.6 does not allow duplicates in bindings
     $this->docker_start_vol = array_unique($this->docker_start_vol);
     //$this->docker_vol = array_unique($this->docker_vol);
 
 
-    // todo: customer feature, how to generalise?
+    // todo: custom feature, how to generalise?
     // build is normally done at 100%, but 200% in this case
     if ($this->cont_image == 'inno/drupal') {
       $this->done_per = 200;
@@ -622,7 +629,7 @@ END;
       ];
     }
 
-    #dpm('--load_meta 4---');
+    #dpm('--load_meta ---');
     #dpm($this->docker_env);
     #dpm($this->docker_start_vol);
     #dpm($this->docker_vol);
@@ -1098,6 +1105,7 @@ END;
 
           $this->markup .="Container id: " . $cont['Id'] .'<br>';
           if ($this->msglevel2) {
+            $this->markup .="Memory " . $cont['HostConfig']['Memory'] .'<br>';
             $this->markup .="RestartPolicy " . print_r($cont['HostConfig']['RestartPolicy'], true);
             $this->markup .="Network " . print_r($cont['NetworkSettings'], true);
           }
@@ -1160,11 +1168,10 @@ END;
           $this->message("$this->id does not exist", 'warning');
         }
         else {
-          // refresh every 5 secs
+          // refresh every Y secs
           $meta_refresh = array(
             '#type' => 'html_tag', '#tag' => 'meta',
-            #'#attributes' => array( 'content' =>  '5', 'http-equiv' => 'refresh',)
-            '#attributes' => array( 'content' => variable_get('webfact_log_refresh', '30'), 'http-equiv' => 'refresh',)
+            '#attributes' => array( 'content' => variable_get('webfact_log_refresh', '45'), 'http-equiv' => 'refresh',)
           );
           drupal_add_html_head($meta_refresh, 'meta_refresh');
 
@@ -1475,12 +1482,13 @@ dpm('coosupdate done');
         // todo: abort here if return=false?
 
         // create the container
-        $config = ['Image'=> $this->cont_image, 
+        $config = ['Image'    => $this->cont_image, 
                    'Hostname' => $this->fqdn,
-                   'Env'  => $this->docker_env, 
+                   'Env'      => $this->docker_env, 
                    //'Volumes'  => [ '/data' => array() ],
                    'Volumes'  => $this->docker_vol,
         ];
+
         #dpm('--create: config--');
         #dpm($config);
         $container= new Docker\Container($config);
@@ -1493,6 +1501,10 @@ dpm('coosupdate done');
           $this->message("start ", 'status', 3);
         }
         #dpm('--create2--');
+        if ($this->cont_mem > 0) {
+          $this->startconfig['Memory'] = $this->cont_mem;
+          watchdog('webfact', 'container->setMemory ' . $this->cont_mem);
+        }
         #dpm($this->startconfig);
         $manager->start($container, $this->startconfig);
 
@@ -1911,7 +1923,8 @@ dpm('coosupdate done');
         drupal_add_js(array('webfact' => array(
           'webfact_site_check' => '1',
           'webfact_nid'        => $this->website->nid,
-          'time_interval'      => 10000, // ms
+          //'time_interval'      => 10000, // ms
+          'time_interval'      => 30000, // ms
         )), 'setting');
         $website_status = '<div class="loader"></div>' . t('Please wait...');
         drupal_add_js(drupal_get_path('module', 'webfact') . '/js/buildstatus.js', 'file');

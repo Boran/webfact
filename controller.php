@@ -28,6 +28,7 @@ class WebfactController {
   protected $done_per;  // status value back from a drupal container when build is finished
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
   protected $actual_restart, $actual_error, $actual_status, $actual_buildstatus;
+  protected $webroot;
 
 
   public function __construct($user_id_override = FALSE, $nid=0) {
@@ -60,6 +61,7 @@ class WebfactController {
     $this->msglevel2 = variable_get('webfact_msglevel2', TRUE);  // more
     $this->msglevel3 = variable_get('webfact_msglevel3', TRUE);  // debug
     $this->cont_mem  = variable_get('webfact_cont_mem', 0);       // default container memory
+    $this->webroot   = variable_get('webfact_www_volume_path', '/var/www/html');
 
     if (isset($account->name)) {
       $this->user= $account->name;
@@ -164,10 +166,9 @@ class WebfactController {
       $coappupdate = <<<END
         <li class="divider"></li>
         <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
-        <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup, stop, rename the container create a new container and finally restore /var/www/html/sites. Any other local changes wil be lost (e.g. local DB). Continue?')">Run container OS update</a></li>
 END;
       $createui  = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
-      $deletewww = "<li><a href=$wpath/deletewww/$this->nid onclick='return confirm(\"Delete persistent data from Drupal containers: /var/www/html and linked Database. There is no going back, are you sure?\")'>Delete drupal data (www+DB)</a></li>";
+      $deletewww = "<li><a href=$wpath/deletewww/$this->nid onclick='return confirm(\"Delete persistent data from Drupal containers: Webroot and linked Database. There is no going back, are you sure?\")'>Delete Drupal data (www+DB)</a></li>";
 
     } else {   // non-drupal container
       $drupal_logs= $coappupdate= $coappupdate='';
@@ -202,7 +203,7 @@ END;
                   $createui
                   <li class="divider"></li>
                   <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Choose if there is no persistent data within the container. Are you sure?')">Delete container</a></li>
-                  <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, meta data on this website and for Drupal sites /var/www/html and the linked Database. Are you sure?')">Delete everything container+data</a></li>
+                  <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, meta data on this website and for Drupal site webroot and the linked Database. Are you sure?')">Delete everything container+data</a></li>
                 </ul>
               </li>
             </ul>
@@ -216,8 +217,10 @@ END;
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   $coappupdate
                   <li class="divider"></li>
-                  $deletewww
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild container </a></li>
+                  <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup the container (commit), create a new one using the current image. Non persistent data will not be in the new container (e.g. local files or DB). Continue?')">Rebuild, backup image first.</a></li>
+                  $deletewww
+                  <li class="divider"></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild with persistence</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
@@ -334,9 +337,9 @@ END;
        watchdog('webfact', "deleteContainerData - container must be running");
        return;
      }
-     $cmd = 'cd /var/www/html && rm -rf * .[a-zA-Z0-9]* ';
+     $cmd = 'cd ' . $this->webroot . ' && rm -rf * .[a-zA-Z0-9]* ';
      $logs = $this->runCommand($cmd);
-     watchdog('webfact', "deleteContainerData $name - /var/www");
+     watchdog('webfact', "deleteContainerData $name - " . $this->webroot);
      return($logs);      // todo: review
   }
 
@@ -498,7 +501,7 @@ END;
         }
       }
       if (variable_get('webfact_www_volume', 1) == 1 ) {
-        $mount = '/var/www/html';     //  todo: make a setting?
+        $mount = $this->webroot;
         #$folder = $sitesdir . $this->id . $mount;
         $folder = $sitesdir . $this->id . '/www';
         $this->docker_vol[$mount] = array() ;
@@ -759,9 +762,10 @@ END;
    * get the status withing the container, from webfact_status.sh
    */
   public function getContainerStatus() {
-    // todo: make the command a parameter
-    $cmd = "if [[ -d /var/www/html ]] && [[ -x /var/www/html/webfact_status.sh ]] ; then /var/www/html/webfact_status.sh; fi;";
-    #$cmd = "cd /var/www/html && ls";
+    // todo: make the command a parameter?
+    $webroot = variable_get('webfact_www_volume_path', '/var/www/html');
+    $cmd = "if [[ -d $webroot ]] && [[ -x $webroot/webfact_status.sh ]] ; then $webroot/webfact_status.sh; fi;";
+    #$cmd = "cd ${this->webroot} && ls";
     $this->actual_status = $this->runCommand($cmd);
     return($this->actual_status);
   }
@@ -1068,11 +1072,6 @@ END;
         $this->deleteContainerDB($this->nid, $this->id);
         $logs = $this->deleteContainerData($this->nid, $this->id);
         $this->markup = "<h3>Results</h3> <pre>$logs</pre>";   // show output
-        #watchdog('webfact', "deleting website DB and /var/www/html/* ");
-        #$this->extdb('delete', 1);    // delete external db, if configured
-        #$cmd = 'cd /var/www/html && rm -rf * .[a-zA-Z0-9]* ';
-        #$logs = $this->runCommand($cmd);
-        #$this->markup = "<h3>Results</h3> $cmd:<pre>$logs</pre>";   // show output
       }
 
       else if (($this->action=='delete') || ($this->action=='deleteui') ) {
@@ -1240,7 +1239,7 @@ END;
       }
 
       else if ($this->action=='druplogs') {
-        $cmd = "cd /var/www/html && drush ws --count=" . variable_get('webfact_druplogs_count', 200);
+        $cmd = "cd " . $this->webroot . " && drush ws --count=" . variable_get('webfact_druplogs_count', 200);
         $logs = $this->runCommand($cmd);
         $this->markup = "<h3>Results</h3> $cmd:<pre>$logs</pre>";   // show output
         return;
@@ -1288,9 +1287,10 @@ END;
 
 
       /*
-       * Process for container level updates (update the lamp stack in the container)
-Assumptions: Ubuntu updates are not enabled in the container and we don't plan to "apt-get upgrade". The DB is external and does not change. The only data that needs to be backed-up/restored is in /var/www/html/sites (done by /root/backup.sh). The /data volume is mounted from the server (and thus survives containder removal)
-      */
+       * Process for container level OS/Tool updates 
+       * 2015.09.10: Keep it simple... Delte the container and rebuild,
+       * assume that data is persistent on volumes.
+       */
       else if ($this->action=='coosupdate') {
         global $base_root;
         $this->client->setDefaultOption('timeout', 60);   // backups can take time
@@ -1303,6 +1303,11 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
           return;
         }
 
+/* Initial idea: (deprecated)
+(update the lamp stack in the container)
+Assumptions: Ubuntu updates are not enabled in the container and we don't plan to "apt-get upgrade". The DB is external and does not change. The only data that needs to be backed-up/restored is in /var/www/html/sites (done by /root/backup.sh). The /data volume is mounted from the server (and thus survives containder removal)
+*/
+/*
         // preconditions:
         // a) if /data a volume, does it have a mapping to a host directory?
         $datavolsrc = '/data'; // todo: parameter
@@ -1337,7 +1342,6 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
           return;
         }
 
-        // process: lets do it
         watchdog('webfact', "coosupdate batch: inside backup, stop, rename, create", WATCHDOG_NOTICE);
         // update: via batch API
         $batch = array(
@@ -1359,7 +1363,34 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
             array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
             array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
             # restore files from /data/html_sites.tgz
-            array('batchCommandCont', array("cd /var/www/html && mv sites sites.$$ && tar xzf /data/html_sites.tgz", $this->id)),
+            array('batchCommandCont', array("cd " . $this->webroot . " && mv sites sites.$$ && tar xzf /data/html_sites.tgz", $this->id)),
+            array('batchContLog', array($this->website->nid, $this->id, variable_get('webfact_cont_log', '/tmp/webfact.log'))),
+          ),
+          'finished' => 'batchUpdateDone',
+          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+        );
+*/
+
+        // update: via batch API
+        watchdog('webfact', "coosupdate batch: stop, backup, create", WATCHDOG_NOTICE);
+        $batch = array(
+          'title' => t('Rebuild Container '),
+          'init_message' => t('Stop and commit to an image '),
+          'operations' => array(
+            #array('batchStopCont',  array($this->website->nid, $this->id)),
+            #todo: what was the idea behind renaming, as opposed to backup/commit?
+            #array('batchRemoveCont', array($this->website->nid, $this->id . '-preupdate', 0)),
+            #array('batchRenameCont', array($this->id, $this->id . '-preupdate')),
+            array('batchSaveCont',   array($this->website->nid, $this->id, 1)),
+            array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
+            array('batchCreateCont', array($this->website->nid, $this->id)),
+            # wait one minute, then loop until fully provisioned
+            array('batchTrack', array($this->website->nid, $this->id, 5, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 20, $this->done_per)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)), // 2min
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
             array('batchContLog', array($this->website->nid, $this->id, variable_get('webfact_cont_log', '/tmp/webfact.log'))),
           ),
           'finished' => 'batchUpdateDone',
@@ -1367,7 +1398,6 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
         );
         batch_set($batch);
         batch_process('website/advanced/' . $this->website->nid); // go here when done
-dpm('coosupdate done');
         return;
       }
 
@@ -1422,7 +1452,8 @@ dpm('coosupdate done');
         $this->message("Run webfact_update.sh (see results below)", 'status', 2);
         watchdog('webfact', "coappupdate $this->id - run webfact_update.sh, log to /tmp/webfact.log", WATCHDOG_NOTICE);
         #$cmd='ps';
-        $cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact.log "; // todo: parameter
+        #$cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact.log "; // todo: parameter
+        $cmd = "cd " . $this->webroot . " && ./webfact_update.sh |tee -a /tmp/webfact.log "; 
         $logs = $this->runCommand($cmd);
         $this->markup = "<h3>Update results</h3><p>Running '${cmd}':</p><pre>$logs</pre><p>See also /tmp/webfact_update.log</p>";   // show output
         return;
@@ -1492,13 +1523,12 @@ dpm('coosupdate done');
         }
 
         // Rebuilding via batch API
-        watchdog('webfact', "rebuild batch- backup, stop, delete, create from sources", WATCHDOG_NOTICE);
+        watchdog('webfact', "rebuild batch- delete, rebuild ", WATCHDOG_NOTICE);
         if ($this->is_drupal == 1) {
           $batch = array(
-          'title' => t('Rebuilding Drupal website from sources'),
-          #'init_message' => t('Rebuild starting.'),
+          'title' => t('Rebuilding website container'),
           'operations' => array(
-            #todo, make optional: array('batchSaveCont', array($this->website->nid, $this->id)),
+            #array('batchSaveCont', array($this->website->nid, $this->id, 0)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
             // repeat until hopefuly 100% reached
@@ -1524,7 +1554,7 @@ dpm('coosupdate done');
           $batch = array(
           'title' => t('Rebuilding from sources'),
           'operations' => array(
-            array('batchSaveCont', array($this->website->nid, $this->id)),
+            array('batchSaveCont',   array($this->website->nid, $this->id, 0)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
             ),

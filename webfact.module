@@ -107,6 +107,15 @@ function webfact_admin_settings() {
     '#size' => 10,
     '#maxlength' => 100,
   );
+  $form['webfact_fieldset_server']['webfact_druplogs_count'] = array(
+    '#title' => t('How many lines to tail on drupal logs'),
+    '#default_value' => variable_get('webfact_druplogs_count', 200),
+    '#description' => t('e.g. 200'),
+    '#type' => 'textfield',
+    '#size' => 10,
+    '#maxlength' => 100,
+  );
+
   $form['webfact_fieldset_server']['webfact_server_sitesdir'] = array(
     '#title' => t('A folder for container mountpoints'),
     '#default_value' => variable_get('webfact_server_sitesdir', array('')),
@@ -148,13 +157,21 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
+  $form['webfact_fieldset_cont']['webfact_www_volume_path'] = array(
+    '#title' => t('The webroot, default /var/www/html'),
+    '#default_value' => variable_get('webfact_www_volume_path', '/var/www/html'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
   $form['webfact_fieldset_cont']['webfact_www_volume'] = array(
-    '#title' => t('Create a volume /var/www/html mapped to /opt/sites/WEBSITE/www on the docker server'),
+    '#title' => t('Create a volume for the webroot above mapped to /opt/sites/WEBSITE/www on the docker server'),
     '#default_value' => variable_get('webfact_www_volume', 1),
     '#description' => t('Automatically add a standard volume for web files. /opt/sites/WEBSITE/www will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
+
 
   $form['webfact_fieldset_cont']['webfact_data_volume'] = array(
     '#title' => t('Create a volume /data mapped to /opt/sites/WEBSITE/data on the docker server'),

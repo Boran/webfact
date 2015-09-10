@@ -14,9 +14,10 @@
 /*
  * batch commands/operations
  */
-function batchSaveCont($nid, $name, &$context) {
+function batchSaveCont($nid, $name, $force=0, &$context) {
   $context['finished'] = 0;
-  if (variable_get('webfact_rebuild_backups', 1) == 1 ) {
+  if ( (variable_get('webfact_rebuild_backups', 1) == 1 ) 
+    || ($force==1) ) {
     watchdog('webfact', "batchSaveCont $name");
     $w= new WebfactController;
     $result = $w->backupContainer($name);

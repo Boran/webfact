@@ -155,8 +155,8 @@ class WebfactController {
     if (! isset($this->website) ) {
       return;
     }
-    $rebuild_src_msg = "Backup, stop, delete and recreate " . $this->website->title .". Data in the container will be lost! Are you sure?";
-    $rebuild_meta_msg = "Backup, stop, delete and recreate from that same backup. i.e. to rebuild after changing an environment setting. Are you sure?";
+    $rebuild_src_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data in the container will be lost. Are you sure?";
+    $rebuild_meta_msg = "Rebuild container but maintain non-persistent data. Commit to a backup image, stop, delete and recreate from that same backup. E.g. rebuild after changing an environment setting. ARE YOU SURE?";
 
     // drupal specific menus
     if ($this->is_drupal==1) {  // enable drupal menus
@@ -166,11 +166,13 @@ class WebfactController {
         <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
         <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup, stop, rename the container create a new container and finally restore /var/www/html/sites. Any other local changes wil be lost (e.g. local DB). Continue?')">Run container OS update</a></li>
 END;
-      $createui = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
+      $createui  = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
+      $deletewww = "<li><a href=$wpath/deletewww/$this->nid onclick='return confirm(\"Delete persistent data from Drupal containers: /var/www/html and linked Database. There is no going back, are you sure?\")'>Delete drupal data (www+DB)</a></li>";
 
     } else {   // non-drupal container
       $drupal_logs= $coappupdate= $coappupdate='';
       $createui = "<li><a href=$wpath/create/$this->nid>Create</a></li>";
+      $deletewww = "";
     }
 
     $nav1 = <<<END
@@ -199,8 +201,8 @@ END;
                   <li class="divider"></li>
                   $createui
                   <li class="divider"></li>
-                  <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Are you sure?')">Delete container</a></li>
-                  <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Are you sure?')">Delete container+meta data</a></li>
+                  <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Choose if there is no persistent data within the container. Are you sure?')">Delete container</a></li>
+                  <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, meta data on this website and for Drupal sites /var/www/html and the linked Database. Are you sure?')">Delete everything container+data</a></li>
                 </ul>
               </li>
             </ul>
@@ -214,8 +216,9 @@ END;
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   $coappupdate
                   <li class="divider"></li>
-                  <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild from sources</a></li>
-                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild from meta-data</a></li>
+                  $deletewww
+                  <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild container </a></li>
+                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild with persistence</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
@@ -286,7 +289,7 @@ END;
 
 
   /*
-   * stop or delete a container by name
+   * delete a container by name and its external DB 
    * todo: this is an experimental abstraction, initially used in hook_node_delete()
    * no checking of permissions,
    */
@@ -300,11 +303,41 @@ END;
      if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
        $manager->stop($container);
      }
+     # keep DB..  $this->deleteContainerDB($nid, $name); 
      $manager->remove($container);
+     watchdog('webfact', "deleteContainer $name - removed");
+  }
+
+  public function deleteContainerDB($nid, $name) {
+     watchdog('webfact', "deleteContainerDB $name");
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+     if (!$container) {
+       watchdog('webfact', "deleteContainerDB $name - no such container");
+       return;
+     }
      $this->nid = $nid;  // needed for extdb()
      $this->id = $name;  // needed for extdb()
      $this->extdb('delete', 0);    // delete external db, if configured
-     watchdog('webfact', "deleteContainer $name - removed");
+  }
+
+
+  public function deleteContainerData($nid, $name) {
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+     if (!$container) {
+       watchdog('webfact', "deleteContainerData $name - no such container");
+       return;
+     }
+     if  (!isset($container->getRuntimeInformations()['State']) 
+       || $container->getRuntimeInformations()['State']['Running'] == FALSE) {
+       watchdog('webfact', "deleteContainerData - container must be running");
+       return;
+     }
+     $cmd = 'cd /var/www/html && rm -rf * .[a-zA-Z0-9]* ';
+     $logs = $this->runCommand($cmd);
+     watchdog('webfact', "deleteContainerData $name - /var/www");
+     return($logs);      // todo: review
   }
 
 
@@ -444,16 +477,41 @@ END;
     if (isset($this->env_server)) {     // pull in default env
       $this->docker_env[] = $this->env_server;
     }
-    // Create a '/data' volume by default?
-    if ($this->is_drupal==1) { 
-      if (variable_get('webfact_data_volume', 1) == 1 ) {
-        #$this->docker_vol[] = "/data =>{}"; // todo: make a setting?
-        //$this->docker_vol[] = [ '/data' => array() ]; // Docker 1.7: array
-        $this->docker_vol['/data'] = array() ; // Docker 1.7: array
-        $this->docker_start_vol[] = variable_get('webfact_server_sitesdir', '/opt/sites/') 
-          . $this->id . ":/data:rw";
+    if ($this->is_drupal == 1) { 
+      // Create a volume mount point automatically?
+      $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
+      if (! file_exists($sitesdir . $this->id) ) {
+        if (! mkdir($sitesdir . $this->id, 0775) ) {
+          watchdog('webfact', 'Server folder ' . $sitesdir . $this->id .' could not be created.');
+        }
       }
-    }
+      if (variable_get('webfact_data_volume', 1) == 1 ) {
+        $mount = '/data';     //  todo: make a setting?
+        $folder = $sitesdir . $this->id . $mount;
+        $this->docker_vol[$mount] = array() ; 
+        $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
+        if (! file_exists($folder) ) {
+          watchdog('webfact', "Create $folder");
+          if (! mkdir($folder, 0775) ) {
+            drupal_set_message("Server folder $folder could not be created.");
+          }
+        }
+      }
+      if (variable_get('webfact_www_volume', 1) == 1 ) {
+        $mount = '/var/www/html';     //  todo: make a setting?
+        #$folder = $sitesdir . $this->id . $mount;
+        $folder = $sitesdir . $this->id . '/www';
+        $this->docker_vol[$mount] = array() ;
+        $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
+        if (! file_exists($folder) ) {
+          watchdog('webfact', "Create $folder");
+          if (! mkdir($folder, 0775) ) {
+            drupal_set_message("Server folder $folder could not be created.");
+          }
+        }
+      }
+
+    } // if drupal
 
     // Template? : Load values there first
     if (isset($this->website->field_template['und'][0]['target_id'])) {
@@ -656,12 +714,12 @@ END;
     $container = $manager->find($id);
     if (strlen($cmd)<1) {
       watchdog('webfact', 'runCommand: invalid cmd=' . $cmd);
-      return;  // container not running, abort
+      return;  // abort
     }
     if (($container==null) || 
       (! isset($container->getRuntimeInformations()['State'])) ||
       ($container->getRuntimeInformations()['State']['Running'] == FALSE)) {
-      #watchdog('webfact', 'runCommand: ignore, container not running');
+      //watchdog('webfact', 'runCommand: ignore, container not running');
       return;  // container not running, abort
     }
     if ($verbose==1 ) {
@@ -828,7 +886,7 @@ END;
   /*
    * extdb()
    * the website database can be external, as opposed to being inside the container.
-   * When inside the conatainer, the boran/drupal image takes care of db creation, but if
+   * When inside the container, the boran/drupal image takes care of db creation, but if
    * external, webfact needs to create a new database
    * params: new DB and user name, verbose messages.
    */
@@ -837,14 +895,13 @@ END;
       return 1;    // do not manage DB
     }
     if (! isset($this->id) ) {
-      watchdog('webfact', 'extdb ' . $action . ': Error: no website name set');
+      watchdog('webfact', 'extdb ' . $action . ', Error: no website id set');
       return 1;  
     }
     if (! isset($this->nid) ) {
-      watchdog('webfact', 'extdb ' . $action . ': Error: no website nid set');
+      watchdog('webfact', 'extdb ' . $action . ', Error: no website nid set');
       return 1;  
     }
-
    
     // naming convertion for DB & usernames: add a prefix to avoid mysql restrictions
     $newuser = 'u_' . $this->id;
@@ -971,11 +1028,11 @@ END;
         #  $this->message("$this->id does not exist",  'error');
         #  return;
         #}
-
         watchdog('webfact', 'deleteall node id ' . $this->nid);
         $batch = array(
           'title' => t('Remove meta data & container ' . $this->id),
           'operations' => array(
+            array('batchRemoveContDBData', array($this->website->nid, $this->id, 0)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 0)),
             array('batchRemoveNode', array($this->website->nid, $this->id, 0)),
           ),
@@ -992,6 +1049,31 @@ END;
         return;
       }
 
+
+      else if ($this->action=='deletewww') {
+        if (stristr($this->category, 'production')) {
+          $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
+          return;
+        }
+        if (! $container) {
+          $this->message("$this->id does not exist",  'error');
+          return;
+        }
+        else if ($container->getRuntimeInformations()['State']['Running'] != TRUE) {
+          if ($this->verbose===1) {
+            $this->message("$this->id must be running first", 'warning');
+            return;
+          }
+        }
+        $this->deleteContainerDB($this->nid, $this->id);
+        $logs = $this->deleteContainerData($this->nid, $this->id);
+        $this->markup = "<h3>Results</h3> <pre>$logs</pre>";   // show output
+        #watchdog('webfact', "deleting website DB and /var/www/html/* ");
+        #$this->extdb('delete', 1);    // delete external db, if configured
+        #$cmd = 'cd /var/www/html && rm -rf * .[a-zA-Z0-9]* ';
+        #$logs = $this->runCommand($cmd);
+        #$this->markup = "<h3>Results</h3> $cmd:<pre>$logs</pre>";   // show output
+      }
 
       else if (($this->action=='delete') || ($this->action=='deleteui') ) {
         // Stop accidental deleting of key containers
@@ -1025,13 +1107,14 @@ END;
           batch_set($batch);
           batch_process('website/advanced/' . $this->website->nid); // go here when done
 
-        } else {
+        } else if ($this->action=='delete') {  
           $manager->remove($container);
           if ($this->verbose===1) {
             $this->message("$this->action $this->id");
             drupal_goto("/website/advanced/$this->nid"); // show new status
           }
         }
+
         return;
       }
 
@@ -1415,7 +1498,7 @@ dpm('coosupdate done');
           'title' => t('Rebuilding Drupal website from sources'),
           #'init_message' => t('Rebuild starting.'),
           'operations' => array(
-            array('batchSaveCont', array($this->website->nid, $this->id)),
+            #todo, make optional: array('batchSaveCont', array($this->website->nid, $this->id)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
             // repeat until hopefuly 100% reached
@@ -1690,6 +1773,7 @@ dpm('coosupdate done');
         case 'delete':
         case 'deleteui':
         case 'deleteall':
+        case 'deletewww':
         case 'create':
         case 'createui':
         case 'restart':
@@ -1823,6 +1907,7 @@ dpm('coosupdate done');
       case 'start':
       case 'delete':
       case 'deleteui':
+      case 'deletewww':
       case 'restart':
       case 'pause':
       case 'kill':
@@ -2245,7 +2330,7 @@ END;
 <ul>
 <li>The hostname within the container is not renamed (e.g. may affect outgoing emails, website headers, etc.)</li>
 <li>External databases (if used) are not renamed </li>
-<li>Docker environment variables such AS VIRTUAL_HOST are unchanged. So, for example, the Nginx reverse proxy will not be able to map to the container web port. To fix VIRTUAL_HOST, do a 'Rebuild from meta data' after renaming (note that the docker image for the container will then be image made before the rebuild, not the original image).</p>
+<li>Docker environment variables such AS VIRTUAL_HOST are unchanged. So, for example, the Nginx reverse proxy will not be able to map to the container web port. To fix VIRTUAL_HOST, do a 'Rebuild with persistence' after renaming (note that the docker image for the container will then be image made before the rebuild, not the original image).</p>
 <!-- Button -->
 <div class="col-xs-2">
   <div class="control-group">
@@ -2554,6 +2639,5 @@ END;
     return $render_array;
   }
 }      // class
-
 
 

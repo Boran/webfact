@@ -53,6 +53,21 @@ function batchRemoveNode($nid, $title, $log=1, &$context) {
   $context['finished'] = 1;
 }
 
+function batchRemoveContDBData($nid, $title, $log=1, &$context) {
+  $context['finished'] = 0;
+  watchdog('webfact', "batchRemoveContData $nid, $title");
+  $w= new WebfactController;
+  $w->deleteContainerDB($nid, $title);
+  $w->deleteContainerData($nid, $title);
+  if ($log==1) {
+    $context['results']['log'][] = 'deleted DB/data for ' . check_plain($title);
+  }
+  $context['message'] = date("H:i:s"). ' deleted DB/data for ' . check_plain($title);
+  $context['finished'] = 1;
+}
+
+
+
 
 function batchStopCont($nid, $title, &$context) {
   $context['finished'] = 0;

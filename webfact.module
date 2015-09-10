@@ -148,10 +148,18 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
+  $form['webfact_fieldset_cont']['webfact_www_volume'] = array(
+    '#title' => t('Create a volume /var/www/html mapped to /opt/sites/WEBSITE/www on the docker server'),
+    '#default_value' => variable_get('webfact_www_volume', 1),
+    '#description' => t('Automatically add a standard volume for web files. /opt/sites/WEBSITE/www will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
+    '#type' => 'checkbox',
+    '#return_value' => 1,
+  );
+
   $form['webfact_fieldset_cont']['webfact_data_volume'] = array(
-    '#title' => t('Create a volume /data mapped to /opt/sites/WEBSITE on the docker server'),
+    '#title' => t('Create a volume /data mapped to /opt/sites/WEBSITE/data on the docker server'),
     '#default_value' => variable_get('webfact_data_volume', 1),
-    '#description' => t('Automatically add a standard volume for sharing backups or other infos from container to server. /opt/sites/WEBSITE will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
+    '#description' => t('Automatically add a standard volume for sharing backups or other infos from container to server. /opt/sites/WEBSITE/data will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
@@ -265,7 +273,7 @@ function webfact_admin_settings() {
     '#return_value' => 1,
   );
   $form['webfact_fieldset_UI']['webfact_rebuild_backups'] = array(
-    '#title' => t('Create automatic backups when rebuilding. Disable this on dev/test servers to save time and diskpace'),
+    '#title' => t('Create automatic backups when rebuilding. Disable this on dev/test servers to save time and diskspace'),
     '#default_value' => variable_get('webfact_rebuild_backups', true),
     '#type' => 'checkbox',
     '#return_value' => 1,
@@ -437,15 +445,16 @@ function webfact_form_validate($form, &$form_state) {
 /*
  * hook_node_insert()
  * when new websites are added, ensure a mountpoint 
- * such as /opt/sites/SITE exist (for /data), 
- * if the setting webfact_data_volume is enabled.
+ * such as /opt/sites/SITE exist
  * Now /opt/sites must be mounted from the docker server itself,
  * since this gui is running in a container too.
  * todo: Developed for a specific use-case, make more generic?
  */
 function webfact_node_insert($node) {
   if ($node->type == 'website') {
-    if (variable_get('webfact_data_volume', 1) !== 1 ) {
+    // automatic volumes enabled?
+    if ( (variable_get('webfact_data_volume', 1) !== 1 )  && 
+      (variable_get('webfact_www_volume', 1) !== 1 ) ) {
       return;
     }
     $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
@@ -458,12 +467,32 @@ function webfact_node_insert($node) {
       return;
     }
     $sitename = $node->field_hostname['und'][0]['value'];
-    #dpm($sitename);
     if (! file_exists($sitesdir . '/' . $sitename) ) {
       if (! mkdir($sitesdir . '/' . $sitename, 0775) ) {
         drupal_set_message("Server folder $sitesdir/$sitename could not be created.");
       }
     }
-  }
+    // create folders for each volume: this is also done in controller at create time
+    // todo: remove it here?
+    if (variable_get('webfact_data_volume', 1) == 1 ) {
+      $folder = $sitesdir . '/' . $sitename . '/data';
+      if (! file_exists($folder) ) {
+        watchdog('webfact', "Create $folder");
+        if (! mkdir($folder, 0775) ) {
+          drupal_set_message("Server folder $folder could not be created.");
+        }
+      }
+    }
+    if (variable_get('webfact_www_volume', 0) == 1 ) {
+      $folder = $sitesdir . '/' . $sitename . '/www';
+      if (! file_exists($folder) ) {
+        watchdog('webfact', "Create $folder");
+        if (! mkdir($folder, 0775) ) {
+          drupal_set_message("Server folder $folder could not be created.");
+        }
+      }
+    }
+
+  }  // if website
 }
 

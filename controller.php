@@ -1144,6 +1144,7 @@ END;
           //watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
           //$manager->inspect($container);
           $cont=$container->getRuntimeInformations();
+          #debug: dpm($cont);
           $this->markup  = '<pre>';
           $this->markup .="Hostname:" . $cont['Config']['Hostname'] .'<br>';
           $this->markup .='<br>';
@@ -1165,11 +1166,11 @@ END;
             }
             $this->markup .="<br>";
           }
-          if (empty($cont['Volumes'])) {
+          if (empty($cont['Config']['Volumes'])) {
             $this->markup .="Volumes: none <br>";
           }
           else {
-            $this->markup .="Volumes " . print_r($cont['Volumes'], true) .'<br>';
+            $this->markup .="Volumes " . print_r($cont['Config']['Volumes'], true) .'<br>';
             # todo: print array paired elements on each line
             #$this->markup .="Volumes:<br>";
             #foreach($cont['Volumes'] as $line) {
@@ -1177,6 +1178,14 @@ END;
             #}
             #$this->markup .="<br>";
           }
+
+          if (empty($cont['Mounts'])) {
+            $this->markup .="Mounts: none <br>";
+          }
+          else {
+            $this->markup .="Mounts " . print_r($cont['Mounts'], true) .'<br>';
+          }
+
 
           if (isset($cont['HostConfig']['PortBindings'])) {
             $this->markup .="PortBindings " . print_r($cont['HostConfig']['PortBindings'], true) .'<br>';

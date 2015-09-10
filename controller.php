@@ -459,7 +459,6 @@ END;
 
     // Initial docker environment variables
 
-    // todo: should only be for Drupal sites?
     $this->fqdn = $this->id . '.' . $this->fserver;  // e.g. MYHOST.webfact.example.ch
 
     if ($this->is_drupal == 1) {
@@ -502,7 +501,7 @@ END;
       }
       if (variable_get('webfact_www_volume', 1) == 1 ) {
         $mount = $this->webroot;
-        #$folder = $sitesdir . $this->id . $mount;
+        #$folder = $sitesdir . $this->id . $mount; //  todo: make a setting?
         $folder = $sitesdir . $this->id . '/www';
         $this->docker_vol[$mount] = array() ;
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
@@ -671,7 +670,7 @@ END;
     //$this->docker_vol = array_unique($this->docker_vol);
 
 
-    // todo: custom feature, how to generalise?
+    // todo: custom feature for "inno/drupal", how to generalise?
     // build is normally done at 100%, but 200% in this case
     if ($this->cont_image == 'inno/drupal') {
       $this->done_per = 200;
@@ -1172,11 +1171,6 @@ END;
           else {
             $this->markup .="Volumes " . print_r($cont['Config']['Volumes'], true) .'<br>';
             # todo: print array paired elements on each line
-            #$this->markup .="Volumes:<br>";
-            #foreach($cont['Volumes'] as $line) {
-            #  $this->markup .=$line .'<br>';
-            #}
-            #$this->markup .="<br>";
           }
 
           if (empty($cont['Mounts'])) {
@@ -1312,14 +1306,14 @@ END;
           return;
         }
 
-/* Initial idea: (deprecated)
+/* Initial idea: (deprecated)  todo: wipe later
 (update the lamp stack in the container)
 Assumptions: Ubuntu updates are not enabled in the container and we don't plan to "apt-get upgrade". The DB is external and does not change. The only data that needs to be backed-up/restored is in /var/www/html/sites (done by /root/backup.sh). The /data volume is mounted from the server (and thus survives containder removal)
 */
 /*
         // preconditions:
         // a) if /data a volume, does it have a mapping to a host directory?
-        $datavolsrc = '/data'; // todo: parameter
+        $datavolsrc = '/data'; 
         $datavol = $container->getRuntimeInformations()['Volumes'];
         if (! isset($datavol[$datavolsrc]) ) {
           $this->message("The container does not have a $datavolsrc volume.", 'error');
@@ -1460,8 +1454,6 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
 
         $this->message("Run webfact_update.sh (see results below)", 'status', 2);
         watchdog('webfact', "coappupdate $this->id - run webfact_update.sh, log to /tmp/webfact.log", WATCHDOG_NOTICE);
-        #$cmd='ps';
-        #$cmd = "cd /var/www/html && ./webfact_update.sh |tee -a /tmp/webfact.log "; // todo: parameter
         $cmd = "cd " . $this->webroot . " && ./webfact_update.sh |tee -a /tmp/webfact.log "; 
         $logs = $this->runCommand($cmd);
         $this->markup = "<h3>Update results</h3><p>Running '${cmd}':</p><pre>$logs</pre><p>See also /tmp/webfact_update.log</p>";   // show output

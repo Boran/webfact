@@ -500,7 +500,8 @@ END;
         if (! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
           if (! mkdir($folder, 0775) ) {
-            drupal_set_message("Server folder $folder could not be created.");
+            #drupal_set_message("Server folder $folder could not be created.");
+            watchdog('webfact', 'Server folder ' . $folder .' could not be created, is the parent folder writeable?');
           }
         }
       }

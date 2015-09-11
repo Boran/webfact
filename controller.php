@@ -157,8 +157,13 @@ class WebfactController {
     if (! isset($this->website) ) {
       return;
     }
-    $rebuild_src_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data in the container will be lost. Are you sure?";
-    $rebuild_meta_msg = "Rebuild container but maintain non-persistent data. Commit to a backup image, stop, delete and recreate from that same backup. E.g. rebuild after changing an environment setting. ARE YOU SURE?";
+    if (variable_get('webfact_manage_db',0) == 0) {
+      $rebuild1_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data in the container (e.g. DBs are within containers) will be lost. Are you sure?";
+    } else {
+      $rebuild1_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data will be lost (but DB are persistent). Are you sure?";
+    }
+    $rebuild2_msg="Backup the container (docker commit). Then " . $rebuild1_msg;
+    $rebuild3_msg = "Rebuild container but maintain non-persistent data. Commit to a docker backup image, stop, delete and recreate from that same image. E.g. rebuild after changing a docker environment setting. Are you sure?";
 
     // drupal specific menus
     if ($this->is_drupal==1) {  // enable drupal menus
@@ -217,11 +222,11 @@ END;
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   $coappupdate
                   <li class="divider"></li>
-                  <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild_src_msg')">Rebuild container </a></li>
-                  <li><a href="$wpath/coosupdate/$this->nid" onclick="return confirm('Backup the container (commit), create a new one using the current image. Non persistent data will not be in the new container (e.g. local files or DB). Continue?')">Rebuild, backup image first.</a></li>
+                  <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild1_msg')">Rebuild container </a></li>
+                  <li><a href="$wpath/rebuild2/$this->nid" onclick="return confirm('$rebuild2_msg')">Rebuild, commit backup image first </a></li>
                   $deletewww
                   <li class="divider"></li>
-                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild_meta_msg')">Rebuild with persistence</a></li>
+                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild3_msg')">Rebuild with persistence</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
@@ -906,7 +911,7 @@ END;
       return 1;  
     }
    
-    // naming convertion for DB & usernames: add a prefix to avoid mysql restrictions
+    // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
     $newuser = 'u_' . $this->id;
     if (strlen($newuser) > 16) {   // trim username
       $newuser = substr($newuser, 0, 15);
@@ -1294,7 +1299,7 @@ END;
        * 2015.09.10: Keep it simple... Delte the container and rebuild,
        * assume that data is persistent on volumes.
        */
-      else if ($this->action=='coosupdate') {
+      else if ($this->action=='rebuild2') {
         global $base_root;
         $this->client->setDefaultOption('timeout', 60);   // backups can take time
         if (! $container) {
@@ -1345,7 +1350,7 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
           return;
         }
 
-        watchdog('webfact', "coosupdate batch: inside backup, stop, rename, create", WATCHDOG_NOTICE);
+        watchdog('webfact', "rebuild2 batch: inside backup, stop, rename, create", WATCHDOG_NOTICE);
         // update: via batch API
         $batch = array(
           'title' => t('Update Container OS '),
@@ -1375,7 +1380,7 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
 */
 
         // update: via batch API
-        watchdog('webfact', "coosupdate batch: stop, backup, create", WATCHDOG_NOTICE);
+        watchdog('webfact', "rebuild2 batch: stop, backup, create", WATCHDOG_NOTICE);
         $batch = array(
           'title' => t('Rebuild Container '),
           'init_message' => t('Stop and commit to an image '),
@@ -1814,7 +1819,7 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
         case 'rebuild':
         case 'rebuildmeta':
         case 'coappupdate':
-        case 'coosupdate':
+        case 'rebuild2':
         case 'coget':
         case 'druplogs':
         case 'logs':
@@ -1948,7 +1953,7 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
       case 'rebuild':
       case 'rebuildmeta':
       case 'coappupdate':
-      case 'coosupdate':
+      case 'rebuild2':
         if (($this->user!=$owner) && (! user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;

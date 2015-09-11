@@ -124,6 +124,45 @@ function batchCommandCont($cmd, $id, &$context) {
 
 
 /*
+ * delete all "backup" images commintted for a container
+ */
+function batchDeleteContImages($id, &$context) {
+  $context['finished'] = 0;
+  watchdog('webfact', "batchDeleteContImages $id");
+  $log='';
+  $w= new WebfactController;
+        $imagemgr = $w->getImageManager();
+        #$this->message("Finding images ..", 'status', 3);
+        $images = $imagemgr->findAll();
+        foreach ($images as $image) {
+          if (! strcmp($id, $image->getRepository())) {  // look for names
+            $data = $imagemgr->inspect($image);
+            #dpm($data);
+            $imagename = $image->__toString();
+            #$this->message("Deleting $imagename", 'status', 3);
+            watchdog('webfact', "deleting $imagename");
+            try {
+              $imagemgr->remove($image);
+            } catch (Exception $e) {   // ignore 409s, seems to work anyway
+              if ($e->getResponse()->getStatusCode() == 409) {
+                ; // ignore conflicts
+                #dpm($e->getResponse());
+              } else {
+                throw($e);
+              }
+            }
+            $log .= "$imagename, ";
+          }
+        }
+        #$this->message("Deleting done");
+  $context['message'] = "Deleted: " . check_plain($log);
+  $context['results']['log'][] = date("H:i:s") . ' ' . $log;
+  #watchdog('webfact', "batchCommandCont done");
+  $context['finished'] = 1;
+}
+
+
+/*
  * logging: append batch log to container log
  */
 function batchContLog($nid, $id, $logfile, &$context) {

@@ -158,7 +158,7 @@ class WebfactController {
       return;
     }
     if (variable_get('webfact_manage_db',0) == 0) {
-      $rebuild1_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data in the container (e.g. DBs are within containers) will be lost. Are you sure?";
+      $rebuild1_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data (e.g. DBs are within containers). It may make sense to choose the option 'Delete Drupal data' first to wipe the webroot too first. Are you sure?";
     } else {
       $rebuild1_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data will be lost (but DB are persistent). Are you sure?";
     }
@@ -208,7 +208,7 @@ END;
                   $createui
                   <li class="divider"></li>
                   <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Choose if there is no persistent data within the container. Are you sure?')">Delete container</a></li>
-                  <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, meta data on this website and for Drupal site webroot and the linked Database. Are you sure?')">Delete everything container+data</a></li>
+                  <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, docker image backups, linked database (if any), webroot volume contents and this meta data. Are you REALLY sure?')">Delete everything: container, data, ..</a></li>
                 </ul>
               </li>
             </ul>
@@ -313,11 +313,11 @@ END;
      }
      # keep DB..  $this->deleteContainerDB($nid, $name); 
      $manager->remove($container);
-     watchdog('webfact', "deleteContainer $name - removed");
+     watchdog('webfact', "deleteContainer $name - removed" . ' by ' . $this->user);
   }
 
   public function deleteContainerDB($nid, $name) {
-     watchdog('webfact', "deleteContainerDB $name");
+     watchdog('webfact', "deleteContainerDB $name" . ' by ' . $this->user);
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
      if (!$container) {
@@ -378,7 +378,7 @@ END;
        $manager->stop($container);
      }
      $manager->rename($container, $new);
-     watchdog('webfact', "renameContainer $old to $new");
+     watchdog('webfact', "renameContainer $old to $new" . ' by ' . $this->user);
   }
 
   /*
@@ -399,7 +399,7 @@ END;
        'comment' => $comment,);
      $savedimage = $this->docker->commit($container, $config);
      $savedimage = $savedimage->__toString();
-     watchdog('webfact', "backupContainer $id to $savedimage");
+     watchdog('webfact', "backupContainer $id to $savedimage" . ' by ' . $this->user);
      return($savedimage);
   }
 
@@ -428,7 +428,7 @@ END;
         $manager->start($container, $this->startconfig);
 
         $msg= "$this->action $this->id: title=" . $this->website->title
-          . ", docker image=$this->cont_image" ;
+          . ", docker image=$this->cont_image"  . ' by ' . $this->user;
         watchdog('webfact', $msg);
 
         if ($verbose == 1) {
@@ -1026,34 +1026,28 @@ END;
 
       // delete meta data and container
       if ($this->action=='deleteall') {
-        // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
-        # even if there is no container, allow node to be wiped
         #if (! $container) {
-        #  $this->message("$this->id does not exist",  'error');
-        #  return;
+        # even if there is no container, allow node to be wiped
         #}
-        watchdog('webfact', 'deleteall node id ' . $this->nid);
+        watchdog('webfact', 'deleteall ' . $this->id . 
+          ', node id=' . $this->nid . ' by ' . $this->user);
         $batch = array(
           'title' => t('Remove meta data & container ' . $this->id),
           'operations' => array(
             array('batchRemoveContDBData', array($this->website->nid, $this->id, 0)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 0)),
             array('batchRemoveNode', array($this->website->nid, $this->id, 0)),
+            array('batchDeleteContImages', array($this->id)),
           ),
           'finished' => 'batchDone',
           'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
         );
         batch_set($batch);
         batch_process('websites'); // go here when done
-        #unset($_SESSION['batch_results']);  // empty logs, else will show on next /advanced visit
-
-        #node_delete($this->nid);   // this will trigger deleteContainer() too
-        #$this->message("Meta data and website deleted");
-        #drupal_goto('/websites');
         return;
       }
 
@@ -1607,7 +1601,6 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
                    //'Volumes'  => [ '/data' => array() ],
                    'Volumes'  => $this->docker_vol,
         ];
-
         #dpm('--create: config--');
         #dpm($config);
         $container= new Docker\Container($config);
@@ -1628,7 +1621,7 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
         $manager->start($container, $this->startconfig);
 
         $msg= "$this->action $this->id: title=" . $this->website->title
-          . ", docker image=$this->cont_image" ;
+          . ", docker image=$this->cont_image" . ' by ' . $this->user;
         watchdog('webfact', $msg);
 
         if ($verbose == 1) {

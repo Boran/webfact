@@ -5,7 +5,7 @@ The Webfactory consists of several components
  * For Drupal build automation: The boran/drupal docker image (on docker hub).
 
 You need:
-* Docker server (e.g. Ubuntu 14.04) with docker 1.5 or later
+* Docker server (e.g. Ubuntu 14.04) with docker 1.7 or later
 * A container for the webfactory (e.g. the drupal lamp container https://github.com/Boran/docker-drupal)
 * Docker-php library 
 * Drupal + contrib modules and the bootstrap theme* 
@@ -13,7 +13,7 @@ You need:
   
 Version
 -------
-This is still in early beta and in a state of flux, but actaully used on several servers. No version tagging yet.
+This is still in beta and in a state of flux, but used on several servers. No version tagging yet.
 
 Installation
 ----------------
@@ -27,6 +27,6 @@ The issue queue in this repo with the meta list https://github.com/Boran/webfact
 Programming notes
 -----------------
 See test.php cmdline.php for examples on using the apis and testing individual functions.
-* Tested with Docker API v1.15
+* Tested with Docker API v1.20 and docker 1.8.1
 * The docker-php library (https://github.com/stage1/docker-php) 
 * The guzzle http client is used. This makes porting to Drupal 8 easier (if fact the first attempt was on Drupal 8 and then focus was shifted back to D7) - hence the dependancy on the composer_manager module.

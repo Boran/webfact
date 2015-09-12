@@ -163,7 +163,8 @@ class WebfactController {
       $rebuild1_msg = "Stop, delete and recreate " . $this->website->title .", e.g. to get the latest OS/programs in the associated image. Non-persistent data will be lost (but DB are persistent). Are you sure?";
     }
     $rebuild2_msg="Backup the container (docker commit). Then " . $rebuild1_msg;
-    $rebuild3_msg = "Rebuild container but maintain non-persistent data. Commit to a docker backup image, stop, delete and recreate from that same image. E.g. rebuild after changing a docker environment setting. Are you sure?";
+    $rebuild3_msg="For fast development/testing. First wipe all data, then stop, delete and recreate";
+    $rebuild4_msg = "Rebuild container but maintain non-persistent data. Commit to a docker backup image, stop, delete and recreate from that same image. E.g. rebuild after changing a docker environment setting. Are you sure?";
 
     // drupal specific menus
     if ($this->is_drupal==1) {  // enable drupal menus
@@ -225,8 +226,9 @@ END;
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild1_msg')">Rebuild container </a></li>
                   <li><a href="$wpath/rebuild2/$this->nid" onclick="return confirm('$rebuild2_msg')">Rebuild, commit backup image first </a></li>
                   $deletewww
+                  <li><a href="$wpath/rebuild3/$this->nid" onclick="return confirm('$rebuild3_msg')">Rebuild, wipe data (for test containers) </a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild3_msg')">Rebuild with persistence</a></li>
+                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild4_msg')">Rebuild with persistence</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
@@ -1306,75 +1308,7 @@ END;
           return;
         }
 
-/* Initial idea: (deprecated)  todo: wipe later
-(update the lamp stack in the container)
-Assumptions: Ubuntu updates are not enabled in the container and we don't plan to "apt-get upgrade". The DB is external and does not change. The only data that needs to be backed-up/restored is in /var/www/html/sites (done by /root/backup.sh). The /data volume is mounted from the server (and thus survives containder removal)
-*/
-/*
-        // preconditions:
-        // a) if /data a volume, does it have a mapping to a host directory?
-        $datavolsrc = '/data'; 
-        $datavol = $container->getRuntimeInformations()['Volumes'];
-        if (! isset($datavol[$datavolsrc]) ) {
-          $this->message("The container does not have a $datavolsrc volume.", 'error');
-          #dpm($datavol);
-          return;
-        } else {
-          $datavolmap = $datavol[$datavolsrc];
-          if (strlen($datavolmap)<1) {
-            $this->message("Container does not have a $datavolsrc volume mapped to a server directory.", 'error');
-            #dpm($datavolmap);
-            return;
-          }
-          else if (strlen($datavolmap)>70) {   // looks like a long patch with a hash
-            $this->message("Container $datavolsrc volume is not mapped to a server directory (found $datavolmap).", 'error');
-            #dpm($datavolmap);
-            return;
-          }
-        }
-
-        // b) /root/backup.sh exists
-        $backup="/root/backup.sh";
-        $ret = $this->runCommand("if [[ -x $backup ]] && [[ -d $datavolsrc ]]; then echo 'OK'; else echo 'NOK'; fi;");
-        //if ( strcmp($answer, 'OK')!==0 ) {  //note: $ret!= 'OK' does not work
-        if ($ret!= 'OK') {
-          #dpm($ret);
-          $this->message("The container does not have $backup or $datavolsrc", 'error');
-          $logs = $this->runCommand(" ls -al $backup $datavolsrc;");
-          $this->markup = "<h3>Update results</h3>ls -al $backup $datavolsrc :<pre>$logs</pre>";   // show output
-          return;
-        }
-
-        watchdog('webfact', "rebuild2 batch: inside backup, stop, rename, create", WATCHDOG_NOTICE);
-        // update: via batch API
-        $batch = array(
-          'title' => t('Update Container OS '),
-          'init_message' => t('Run backup inside container to /data'),
-          'operations' => array(
-            array('batchCommandCont', array("/root/backup.sh && ls -altr /data", $this->id)),
-            # todo: check that /data/html_sites.tgz exists
-            # todo: verify that sql is external
-            array('batchStopCont', array($this->website->nid, $this->id)),
-            array('batchRemoveCont', array($this->website->nid, $this->id . '-preupdate', 0)),
-            array('batchRenameCont', array($this->id, $this->id . '-preupdate')),
-            array('batchCreateCont', array($this->website->nid, $this->id)),
-            # wait one minute, then loop until fully provisioned
-            array('batchTrack', array($this->website->nid, $this->id, 5)),
-            array('batchTrack', array($this->website->nid, $this->id, 10)),
-            array('batchTrack', array($this->website->nid, $this->id, 20)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)), // 2min
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
-            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
-            # restore files from /data/html_sites.tgz
-            array('batchCommandCont', array("cd " . $this->webroot . " && mv sites sites.$$ && tar xzf /data/html_sites.tgz", $this->id)),
-            array('batchContLog', array($this->website->nid, $this->id, variable_get('webfact_cont_log', '/tmp/webfact.log'))),
-          ),
-          'finished' => 'batchUpdateDone',
-          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
-        );
-*/
-
-        // update: via batch API
+        // via batch API
         watchdog('webfact', "rebuild2 batch: stop, backup, create", WATCHDOG_NOTICE);
         $batch = array(
           'title' => t('Rebuild Container '),
@@ -1385,6 +1319,45 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
             #array('batchRemoveCont', array($this->website->nid, $this->id . '-preupdate', 0)),
             #array('batchRenameCont', array($this->id, $this->id . '-preupdate')),
             array('batchSaveCont',   array($this->website->nid, $this->id, 1)),
+            array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
+            array('batchCreateCont', array($this->website->nid, $this->id)),
+            # wait one minute, then loop until fully provisioned
+            array('batchTrack', array($this->website->nid, $this->id, 5, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 10, $this->done_per)),
+            array('batchTrack', array($this->website->nid, $this->id, 20, $this->done_per)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)), // 2min
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
+            array('batchWaitInstalled', array($this->website->nid, $this->id, 20, 6, $this->done_per)),
+            array('batchContLog', array($this->website->nid, $this->id, variable_get('webfact_cont_log', '/tmp/webfact.log'))),
+          ),
+          'finished' => 'batchUpdateDone',
+          'file' => drupal_get_path('module', 'webfact') . '/batch.inc',
+        );
+        batch_set($batch);
+        batch_process('website/advanced/' . $this->website->nid); // go here when done
+        return;
+      }
+
+
+      else if ($this->action=='rebuild3') {
+        global $base_root;
+        $this->client->setDefaultOption('timeout', 60);   // backups can take time
+        if (! $container) {
+          $this->message("$this->id does not exist", 'warning');
+          return;
+        }
+        if ($this->getStatus($this->nid) != 'running' ) {
+          $this->message("The container is not running.", 'error');
+          return;
+        }
+
+        // via batch API
+        watchdog('webfact', "rebuild3 batch: stop, backup, create", WATCHDOG_NOTICE);
+        $batch = array(
+          'title' => t('Rebuild Container '),
+          'init_message' => t('Stop and commit to an image '),
+          'operations' => array(
+            array('batchRemoveContDBData', array($this->website->nid, $this->id, 0)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
             array('batchCreateCont', array($this->website->nid, $this->id)),
             # wait one minute, then loop until fully provisioned
@@ -1814,6 +1787,7 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
         case 'rebuildmeta':
         case 'coappupdate':
         case 'rebuild2':
+        case 'rebuild3':
         case 'coget':
         case 'druplogs':
         case 'logs':
@@ -1948,6 +1922,7 @@ Assumptions: Ubuntu updates are not enabled in the container and we don't plan t
       case 'rebuildmeta':
       case 'coappupdate':
       case 'rebuild2':
+      case 'rebuild3':
         if (($this->user!=$owner) && (! user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;

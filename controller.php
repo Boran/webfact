@@ -150,6 +150,17 @@ class WebfactController {
   }
 
 
+  protected function touch_node_date() { 
+    if (!$this->nid) 
+      return -1;
+    $this->website = node_load($this->nid);
+    $this->website->revision = 1;    // history of changes
+    $this->website->log = "touch node date, by $this->user";
+    $this->website->changed = time();
+    node_save($this->website);     // Save the updated node
+  }
+
+
   /*
    * bootstrap navigation on the website/advanced page
    */
@@ -1072,6 +1083,7 @@ END;
         }
         $this->deleteContainerDB($this->nid, $this->id);
         $logs = $this->deleteContainerData($this->nid, $this->id);
+        $this->touch_node_date();
         $this->markup = "<h3>Results</h3> <pre>$logs</pre>";   // show output
       }
 
@@ -1095,6 +1107,7 @@ END;
         }
 
         watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
+        $this->touch_node_date();
         if ($this->action=='deleteui') {  // use batch
           $batch = array(
             'title' => t('Remove ' . $this->id),
@@ -1298,6 +1311,7 @@ END;
        */
       else if ($this->action=='rebuild2') {
         global $base_root;
+        $this->touch_node_date();
         $this->client->setDefaultOption('timeout', 60);   // backups can take time
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
@@ -1341,6 +1355,7 @@ END;
 
       else if ($this->action=='rebuild3') {
         global $base_root;
+        $this->touch_node_date();
         $this->client->setDefaultOption('timeout', 60);   // backups can take time
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
@@ -1380,6 +1395,7 @@ END;
 
       else if ($this->action=='coappupdate') {
         global $base_root;
+        $this->touch_node_date();
         $this->client->setDefaultOption('timeout', 120);   // can take time
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
@@ -1436,6 +1452,7 @@ END;
 
       else if ($this->action=='rebuildmeta') {
         global $base_root;
+        $this->touch_node_date();
         $this->client->setDefaultOption('timeout', 60);
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
@@ -1498,6 +1515,7 @@ END;
 
         // Rebuilding via batch API
         watchdog('webfact', "rebuild batch- delete, rebuild ", WATCHDOG_NOTICE);
+        $this->touch_node_date();
         if ($this->is_drupal == 1) {
           $batch = array(
           'title' => t('Rebuilding website container'),
@@ -1562,7 +1580,8 @@ END;
         );
         batch_set($batch);
         batch_process('website/advanced/' . $this->website->nid); // go here when done
-      }
+        $this->touch_node_date();
+       }
 
       else if ($this->action=='create') {
         $this->extdb('create', $verbose);  // if an an external DB is needed
@@ -1597,6 +1616,7 @@ END;
         $msg= "$this->action $this->id: title=" . $this->website->title
           . ", docker image=$this->cont_image" . ' by ' . $this->user;
         watchdog('webfact', $msg);
+        $this->touch_node_date();
 
         if ($verbose == 1) {
           $this->message($msg, 'status', 2);
@@ -2573,7 +2593,9 @@ END;
        . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>$this->restartpolicy</div>"
        . "<div class=col-xs-2>Auto start:</div> <div class=col-xs-4>($this->actual_restart)</div>"
 
-       . "<div class=col-xs-2>Owner:</div> <div class=col-xs-10>$owner</div>"
+       #. "<div class=col-xs-2>Owner:</div> <div class=col-xs-10>$owner</div>"
+       . "<div class=col-xs-2>Owner:</div> <div class=col-xs-4>$owner</div>"
+       . "<div class=col-xs-2>Last change:</div> <div class=col-xs-4>" . date("Y-m-d H:i", $this->website->changed) ."</div>"
       ;
       if (isset($this->website->body['und'][0]['safe_value'])) {
         $description.= "<div class=col-xs-2>Description:</div> <div class=col-xs-10>"

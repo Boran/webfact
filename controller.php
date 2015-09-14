@@ -1370,7 +1370,7 @@ END;
         watchdog('webfact', "rebuild3 batch: stop, backup, create", WATCHDOG_NOTICE);
         $batch = array(
           'title' => t('Rebuild Container '),
-          'init_message' => t('Stop and commit to an image '),
+          'init_message' => t('Stop and remove '),
           'operations' => array(
             array('batchRemoveContDBData', array($this->website->nid, $this->id, 0)),
             array('batchRemoveCont', array($this->website->nid, $this->id, 1)),

@@ -501,8 +501,11 @@ END;
       // Create a volume mount point automatically?
       $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
       if (! file_exists($sitesdir . $this->id) ) {
-        if (! mkdir($sitesdir . $this->id, 0775) ) {
-          watchdog('webfact', 'Server folder ' . $sitesdir . $this->id .' could not be created.');
+        if ((variable_get('webfact_data_volume', 1) == 1 ) || (variable_get('webfact_www_volume', 1) == 1 ) ) {
+      
+          if (! mkdir($sitesdir . $this->id, 0775) ) {
+            watchdog('webfact', 'Server folder ' . $sitesdir . $this->id .' could not be created.');
+          }
         }
       }
       if (variable_get('webfact_data_volume', 1) == 1 ) {

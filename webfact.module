@@ -199,7 +199,7 @@ function webfact_admin_settings() {
   );
   $form['webfact_fieldset_rproxy']['webfact_rproxy_conf'] = array(
     '#title' => t('Reverse proxy config file'),
-    '#default_value' => variable_get('webfact_rproxy_conf', ''),
+    '#default_value' => variable_get('webfact_rproxy_conf', array('/etc/nginx/conf.d/default.conf')),
     '#description' => t('default /etc/nginx/conf.d/default.conf'),
     '#type' => 'textfield',
     '#size' => 30,
@@ -215,7 +215,7 @@ function webfact_admin_settings() {
   );
   $form['webfact_fieldset_rproxy']['webfact_rproxy_loglines'] = array(
     '#title' => t('How many lines to tail on nginx logs'),
-    '#default_value' => variable_get('webfact_rproxy_loglines', array('')),
+    '#default_value' => variable_get('webfact_rproxy_loglines', array('1000')),
     '#description' => t('default 1000'),
     '#type' => 'textfield',
     '#size' => 10,
@@ -297,7 +297,8 @@ function webfact_admin_settings() {
   );
   $form['webfact_fieldset_UI']['webfact_log_refresh'] = array(
     '#title' => t('Refresh delay (secs) for the container log UI'),
-    '#default_value' => variable_get('webfact_log_refresh', array('')),
+    #'#default_value' => variable_get('webfact_log_refresh', array('')),
+    '#default_value' => variable_get('webfact_log_refresh', array('30')),
     '#description' => t('default 30'),
     '#type' => 'textfield',
     '#size' => 10,

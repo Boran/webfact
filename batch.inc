@@ -200,7 +200,7 @@ function batchTrack($nid, $id, $timer, $done, &$context) {
   $context['finished'] = 0;
   $w= new WebfactController(0, $nid);
   $result = $w->getContainerBuildStatus($nid);
-  watchdog('webfact', "batchTrack nid=$nid, $id, build status=$result");
+  watchdog('webfact', "batchTrack nid=$nid, $id, build status=$result, done=$done");
   #if ( ($result==100) || ($result==200) ) {
   //if ( $result == variable_get('webfact_build_done_value', 200) ) {
   if ( $result == '' ) {   // something is wrong, abort
@@ -257,7 +257,7 @@ function batchWaitInstalled($nid, $title, $timer, $count, $done, &$context) {
       $context['results']['log'][] = "building: installing Drupal ($result)";
       $context['message'] = "waiting on Drupal installation ($result)";
     } else {  // post install, e.g. puppet
-      $context['results']['log'][] = "building: tuning container ($result)";
+      $context['results']['log'][] = "building: tuning container ($result) done=$done";
       $context['message'] = "waiting on container tuning ($result)";
     }
     sleep($timer);           // wait

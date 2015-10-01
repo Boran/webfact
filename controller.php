@@ -694,7 +694,7 @@ END;
 
     // todo: custom feature for "inno/drupal", how to generalise?
     // build is normally done at 100%, but 200% in this case
-    if ($this->cont_image == 'inno/drupal') {
+    if ( ($this->cont_image == 'inno/drupal') || ($this->cont_image == 'inno/drupal2')) {
       $this->done_per = 200;
     }
 
@@ -1309,7 +1309,7 @@ END;
 
       /*
        * Process for container level OS/Tool updates 
-       * 2015.09.10: Keep it simple... Delte the container and rebuild,
+       * 2015.09.10: Keep it simple... Delete the container and rebuild,
        * assume that data is persistent on volumes.
        */
       else if ($this->action=='rebuild2') {
@@ -1370,7 +1370,7 @@ END;
         }
 
         // via batch API
-        watchdog('webfact', "rebuild3 batch: stop, backup, create", WATCHDOG_NOTICE);
+        watchdog('webfact', "rebuild3 batch: stop, delete, create", WATCHDOG_NOTICE);
         $batch = array(
           'title' => t('Rebuild Container '),
           'init_message' => t('Stop and remove '),

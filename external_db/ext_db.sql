@@ -55,3 +55,48 @@ DELIMITER ;
 grant execute on procedure CreateAppDB to 'webfact_create'@'%';
 grant execute on procedure DeleteAppDB to 'webfact_create'@'%';
 
+-- stored procedure rename_db: Rename a database my means of table copying.
+-- http://stackoverflow.com/questions/67093/how-do-i-quickly-rename-a-mysql-database-change-schema-name
+-- Caveats: 
+-- Will clobber any existing database with the same name as the 'new' database name.
+-- ONLY copies tables; stored procedures, views, triggers and other db objects are not copied.
+-- Tomer Altman (taltman@ai.sri.com)
+-- Webfactory: We call it RenameAppDB() rather than rename_db(). Adapted to rename user too.
+
+delimiter //
+DROP PROCEDURE IF EXISTS RenameAppDB;
+CREATE PROCEDURE RenameAppDB(IN old_db VARCHAR(100), IN new_db VARCHAR(100), IN old_user VARCHAR(50), new_user VARCHAR(5))
+BEGIN
+    DECLARE current_table VARCHAR(100);
+    DECLARE done INT DEFAULT 0;
+    DECLARE old_tables CURSOR FOR select table_name from information_schema.tables where table_schema = old_db;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+    # Delete and create the newdb
+    SET @output = CONCAT('DROP SCHEMA IF EXISTS ', new_db, ';'); 
+    PREPARE stmt FROM @output;
+    EXECUTE stmt;
+
+    SET @output = CONCAT('CREATE SCHEMA IF NOT EXISTS ', new_db, ';');
+    PREPARE stmt FROM @output;
+    EXECUTE stmt;
+
+    # Copy old tables to newdb
+    OPEN old_tables;
+    REPEAT
+        FETCH old_tables INTO current_table;
+        IF NOT done THEN
+        SET @output = CONCAT('alter table ', old_db, '.', current_table, ' rename ', new_db, '.', current_table, ';');
+        PREPARE stmt FROM @output;
+        EXECUTE stmt;
+
+        END IF;
+    UNTIL done END REPEAT;
+    CLOSE old_tables;
+    
+    ## todo: drop olddb
+    ## rename user too
+    SET @output = CONCAT('RENAME USER ', old_user, ' ' , new_user , ';'); 
+    PREPARE stmt FROM @output;
+    EXECUTE stmt;
+END//

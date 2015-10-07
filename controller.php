@@ -20,7 +20,7 @@ use Docker\Exception\ImageNotFoundException;
  * encapsulate the Webfactory stuff into a calls, for easier Drupal7/8 porting
  */
 class WebfactController {
-  protected $client, $hostname, $nid, $id, $markup, $result, $status, $docker;
+  protected $client, $hostname, $nid, $id, $did, $markup, $result, $status, $docker;
   protected $config, $user, $website, $des, $category;
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $cont_mem, $dserver, $fserver, $loglines, $env_server; // settings
@@ -241,7 +241,7 @@ END;
                   <li class="divider"></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild4_msg')">Rebuild with persistence</a></li>
                   <li class="divider"></li>
-                  <li><a href="$wpath/corename/$this->nid">Rename container,website</a></li>
+                  <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
       <!--        <li><a href="$wpath/couploadfile/$this->nid">File Upload</a></li>   -->
@@ -376,23 +376,73 @@ END;
      watchdog('webfact', "stopContainer $name - done");
   }
 
+  public function startContainer($name) {
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+     if (!$container) {
+       watchdog('webfact', "startContainer $name - no such container");
+       return;
+     }
+     if  ($container->getRuntimeInformations()['State']['Running'] == FALSE) {
+       $manager->start($container);
+     }
+     watchdog('webfact', "startContainer $name - done");
+  }
+
 
   /*
    * rename a container
    * no checking of permissions,
+   * TODO: check for name conflict, i.e. newname does not already exist! XX
    */
-  public function renameContainer($old, $new) {
+  public function renameContainer($old, $newname, $verbose) {
      $manager = $this->getContainerManager();
      $container = $manager->find($old);
      if (!$container) {
        watchdog('webfact', "renameContainer $old - no such container");
+       if ($verbose==1) {
+          $this->message("$this->id does not exist");
+       }
        return;
      }
      if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
        $manager->stop($container);
      }
-     $manager->rename($container, $new);
-     watchdog('webfact', "renameContainer $old to $new" . ' by ' . $this->user);
+
+     if ($verbose==1) {
+       $this->message("Rename container and metaname"); ##
+     }
+     # a) rename container
+     $manager->rename($container, $newname);
+     watchdog('webfact', "renameContainer $old to $newname" . ' by ' . $this->user);
+     # b) rename metadata
+     $this->website->field_hostname['und'][0]['value'] = $newname;
+     node_save($this->website);     // Save the updated node
+     $this->website=node_load($this->website->nid);  # reload cache
+
+     # c) Rename server folder
+     $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
+     $olddir = $sitesdir . $this->id;
+     $newdir = $sitesdir . $newname;
+     if ($verbose==1) {
+       $this->message("Rename server folder $olddir renamed to $newdir");
+     }
+     if ( file_exists($olddir) && is_writable($olddir) ) {
+       if ( rename($olddir, $newdir) ) {
+          watchdog('webfact', "renameContainer $olddir renamed to $newdir");
+       }
+     } else {
+       watchdog('webfact', "renameContainer warning $olddir does not exist or was not writeable");
+     }
+
+     # Rename database+user, metadata (disable since the drupal settings.php would also need to be adapted)
+     #$this->extdb('rename', 1, $newname); 
+
+     # Start the container
+     $this->startContainer($newname);
+     if ($verbose==1) {
+       $this->message('done');
+     }
   }
 
   /*
@@ -787,7 +837,7 @@ END;
   }
 
   /*
-   * get the status withing the container, from webfact_status.sh
+   * get the status within the container, from webfact_status.sh
    */
   public function getContainerStatus() {
     // todo: make the command a parameter?
@@ -935,13 +985,13 @@ END;
       watchdog('webfact', 'extdb ' . $action . ', Error: no website nid set');
       return 1;  
     }
-   
+
     // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
     $newuser = 'u_' . $this->id;
     if (strlen($newuser) > 16) {   // trim username
       $newuser = substr($newuser, 0, 15);
     }
-    $newdb = 'd_' . $this->id; 
+    $newdb = 'd_' . $this->id;
 
     watchdog('webfact', $action . ' database and write mysql settings to the docker env field for ' . $newdb);
     $mysqlhost=variable_get('webfact_manage_db_host');
@@ -998,6 +1048,7 @@ END;
 
     } else if ($action == 'rename') {
       // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
+      // 2015.10.07: feature not used any more
       $renameuser = 'u_' . $newname;
       if (strlen($renameuser) > 16) {   // trim username
         $renameuser = substr($renameuser, 0, 15);
@@ -2388,10 +2439,11 @@ END;
 <form >
 <fieldset>
 <legend>Change the name of a container</legend>
-<p>The docker container and metadata hostname will be renamed, the server /data mount-point moved and DB renamed. However:<p>
+<p>The docker container and metadata hostname will be renamed and the server /data mount-point moved. However:<p>
 <ul>
-<li>The hostname within the container is not renamed (e.g. may affect outgoing emails, website headers, etc.)</li>
-<li>Docker environment variables such AS VIRTUAL_HOST are unchanged. So, for example, the Nginx reverse proxy will not be able to map to the container web port. To fix VIRTUAL_HOST (assume dta is stored outside the container), do a 'Rebuild with persistence' after renaming (which deletes and recreates the container).</p>
+<li>The DB is not renamed (so apps such as drupal can still run)</li>
+<li>The name within the container is not changed (e.g. may affect outgoing emails, website titles/headers, etc.)</li>
+<li>Docker environment variables such AS VIRTUAL_HOST are unchanged. So, for example, the Nginx reverse proxy will not be able to map to the container web port. To fix VIRTUAL_HOST (assume dta is stored outside the container), do a 'Rebuild container' after renaming (which deletes and recreates the container).</p>
 <!-- Button -->
 <div class="col-xs-2">
   <div class="control-group">
@@ -2420,37 +2472,7 @@ END;
         #dpm($_url['query']);
         $newname = check_plain($_url['query']['newname']);   // security
         $newname = preg_replace('/[^A-Za-z0-9]/', '', strtolower($newname));
-        $container = $manager->find($this->id);
-        if (! $container) {
-          $this->message("$this->id does not exist");
-          break;
-        }
-        ## TODO: check for name conflict, i.e. newname does not already exist!
-
-        watchdog('webfact', "corename: Rename container and meta hostname from $this->id to $newname");
-        # a) rename container
-        $this->renameContainer($this->id, $newname);
-        $this->message("Rename container and metaname");
-        # b) rename metadata
-        $this->website->field_hostname['und'][0]['value'] = $newname;
-        node_save($this->website);     // Save the updated node
-        $this->website=node_load($this->website->nid);  # reload cache
-        # c) Rename server folder
-        $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
-	$olddir = $sitesdir . $this->id;
-	$newdir = $sitesdir . $newname;
-        if ( file_exists($olddir) && is_writable($olddir) ) {
-	  drupal_set_message("Rename server folder $olddir renamed to $newdir");
-	  if ( rename($olddir, $newdir) ) {
-            watchdog('webfact', "corename: renamed $olddir renamed to $newdir");
-	  }
-        } else {
-          watchdog('webfact', "corename: warning $olddir does not exist or was not writeable");
-        }
-        # d) Rename (external) database+user, metadata
-        $this->extdb('rename', 1, $newname); 
-
-        $this->message("done");
+        $this->renameContainer($this->id, $newname, 1);  // 1=verbose messages to UI
         drupal_goto("/website/advanced/$this->nid"); // jump back to  status
         break;
 

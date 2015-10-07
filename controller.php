@@ -312,7 +312,6 @@ END;
 
   /*
    * delete a container by name and its external DB 
-   * todo: this is an experimental abstraction, initially used in hook_node_delete()
    * no checking of permissions,
    */
   public function deleteContainer($nid, $name) {
@@ -391,11 +390,35 @@ END;
 
 
   /*
+   * rebuild: stop, delete, create
+   */
+  protected function rebuildContainer ($name, $verbose=0) {
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+     if (!$container) {
+       watchdog('webfact', "rebuildContainer $name - no such container");
+       return;
+     }
+
+     #$this->backupContainer($name);
+     if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+       $manager->stop($container);
+     }
+     $manager->remove($container);
+     $this->arguments('create', $this->nid, 0);  // verbose=0
+     watchdog('webfact', "rebuildContainer $name - done");
+     if ($verbose==1) {
+       $this->message('Container deleted and recreated');
+     }
+  }
+
+
+  /*
    * rename a container
    * no checking of permissions,
    * TODO: check for name conflict, i.e. newname does not already exist! XX
    */
-  public function renameContainer($old, $newname, $verbose) {
+  protected function renameContainer($old, $newname, $verbose) {
      $manager = $this->getContainerManager();
      $container = $manager->find($old);
      if (!$container) {
@@ -438,8 +461,9 @@ END;
      # Rename database+user, metadata (disable since the drupal settings.php would also need to be adapted)
      #$this->extdb('rename', 1, $newname); 
 
-     # Start the container
      $this->startContainer($newname);
+     # re-make the container
+     #$this->rebuildContainer($newname, $verbose);    // would be needed via API
      if ($verbose==1) {
        $this->message('done');
      }
@@ -2438,12 +2462,21 @@ END;
 <!-- Bootstrap: -->
 <form >
 <fieldset>
-<legend>Change the name of a container</legend>
-<p>The docker container and metadata hostname will be renamed and the server /data mount-point moved. However:<p>
+<legend>Renaming a container</legend>
 <ul>
-<li>The DB is not renamed (so apps such as drupal can still run)</li>
-<li>The name within the container is not changed (e.g. may affect outgoing emails, website titles/headers, etc.)</li>
-<li>Docker environment variables such AS VIRTUAL_HOST are unchanged. So, for example, the Nginx reverse proxy will not be able to map to the container web port. To fix VIRTUAL_HOST (assume dta is stored outside the container), do a 'Rebuild container' after renaming (which deletes and recreates the container).</p>
+<li>The docker container and metadata hostname will be renamed</li>
+<li>The server mount-point moved (for /data and /var/www/html)</li>
+</ul>
+<p>Notes:</p>
+<ul>
+<li>Names within the container is not changed (e.g. may affect outgoing emails, website titles/headers, etc.)</li>
+<li>The DB is not renamed (so apps such as drupal continue to accedd the saame DB)</li>
+</ul>
+<p>After renaming you probably need to rebuild the container too:</p>
+<ul>
+<li>Deleting and re-creating the container (so that Docker environment variables such AS VIRTUAL_HOST are updated for reverse proxies). The environment variables in the metadata are passed to docker.</li>
+<li>Warning: only do this for containers where data is persistent (mounted volumes/external DB) !</li>
+</ul
 <!-- Button -->
 <div class="col-xs-2">
   <div class="control-group">

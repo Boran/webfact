@@ -24,7 +24,8 @@ BEGIN
     DEALLOCATE PREPARE stmt;
 
     # this must be the second statement
-    SET @s = CONCAT('CREATE DATABASE ', db_name);
+    #SET @s = CONCAT('CREATE DATABASE ', db_name);
+    SET @s = CONCAT('CREATE DATABASE IF NOT EXISTS ', db_name);
     PREPARE stmt FROM @s;
     EXECUTE stmt;
     DEALLOCATE PREPARE stmt;

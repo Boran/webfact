@@ -366,7 +366,6 @@ END;
      if (! rmdir($serverdir . '/www') )  { watchdog('webfact', "cannot delete " . $serverdir . '/www'); }
      if (! rmdir($serverdir . '/data') ) { watchdog('webfact', "cannot delete " . $serverdir . '/data'); }
      if (! rmdir($serverdir          ) ) { watchdog('webfact', "cannot delete " . $serverdir          ); }
-// XX
      watchdog('webfact', "deleteContainerData $name - " . $this->webroot);
      return($logs);      // todo: review
   }
@@ -385,6 +384,7 @@ END;
      watchdog('webfact', "stopContainer $name - done");
   }
 
+  // todo: should be protected, due to $this
   public function startContainer($name) {
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
@@ -393,7 +393,8 @@ END;
        return;
      }
      if  ($container->getRuntimeInformations()['State']['Running'] == FALSE) {
-       $manager->start($container);
+       #$manager->start($container);
+       $manager->start($container, $this->startconfig);
      }
      watchdog('webfact', "startContainer $name - done");
   }
@@ -479,9 +480,12 @@ END;
 
      # Rename database+user, metadata:  
      # 7.10.2015: disabled since the drupal settings.php would also need to be adapted
-     # so the db/user will always have the "old" name, but can be found in the dokcer and meta env.
+     # so the db/user will always have the "old" name, but can be found in the docker and meta env.
      #$this->extdb('rename', 1, $newname); 
 
+     # Update object with new name, run with apropriate params
+     $this->id=$newname;
+     $this->load_meta();
      $this->startContainer($newname);
 
      # re-make the container: 7.10.2015: disabled, do a level higher

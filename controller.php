@@ -477,17 +477,20 @@ END;
        return 1;
      }
 
-     # Rename database+user, metadata:  disabled since the drupal settings.php would also need to be adapted
+     # Rename database+user, metadata:  
+     # 7.10.2015: disabled since the drupal settings.php would also need to be adapted
+     # so the db/user will always have the "old" name, but can be found in the dokcer and meta env.
      #$this->extdb('rename', 1, $newname); 
 
-#     $this->startContainer($newname);
+     $this->startContainer($newname);
 
-     # re-make the container, would be needed via API
+     # re-make the container: 7.10.2015: disabled, do a level higher
      #$this->rebuildContainer($newname, $verbose);  
      if ($verbose==1) {
        $this->message('done');
      }
   }
+
 
   /*
    * backup a container (commit an image)
@@ -1062,7 +1065,7 @@ END;
     if (!empty($this->website->field_docker_environment['und']) ) {
       foreach ($this->website->field_docker_environment['und'] as $row) {
         if ((isset($row['safe_value'])) && ( preg_match("/MYSQL_USER=(.+)/", $row['safe_value'], $matches) ) ) {
-          $newuser=$matches[1];   // override default
+          $newuser=$matches[1];
           watchdog('webfact', "use existing mysql user $newuser");
         }
       }
@@ -1083,7 +1086,7 @@ END;
     if (!empty($this->website->field_docker_environment['und']) ) {
       foreach ($this->website->field_docker_environment['und'] as $row) {
         if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
-          $pw=$matches[1];   // override default
+          $pw=$matches[1]; 
           watchdog('webfact', 'use existing mysql password');
         }
       }

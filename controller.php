@@ -438,50 +438,50 @@ END;
        if ($verbose==1) {
           $this->message("$old does not exist");
        }
+       throw new Exception("renameContainer $old - no such container");
        return 1;
      }
      if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
        $manager->stop($container);
      }
 
-     if ($verbose==1) {
-       $this->message("Rename container and metaname"); ##
-     }
-     # a) rename container
-     $manager->rename($container, $newname);
-     # b) rename metadata
-     $this->website->field_hostname['und'][0]['value'] = $newname;
-     node_save($this->website);     // Save the updated node
-     $this->website=node_load($this->website->nid);  # reload cache
-
-     # c) Rename server folder
+     # a) Rename server folder
      $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
      $olddir = $sitesdir . $old;
      $newdir = $sitesdir . $newname;
-     if ($verbose==1) {
-       $this->message("Rename server folder $olddir renamed to $newdir");
-     }
      if ( file_exists($olddir) && is_writable($olddir) ) {
        if ( rename($olddir, $newdir) ) {
          watchdog('webfact', "renameContainer $olddir renamed to $newdir");
        } else {
-         watchdog('webfact', "renameContainer error $olddir to $newdir");
-         return 1;
+         throw new Exception("renameContainer: error $olddir to $newdir");
        }
      } else {
        if ( ! file_exists($olddir) ) {
-         watchdog('webfact', "ERROR, renameContainer $olddir does not exist");
+         throw new Exception("renameContainer $olddir does not exist");
        }
        if ( ! is_writable($olddir) ) {
-         watchdog('webfact', "ERROR, renameContainer $olddir not writeable");
+         throw new Exception("renameContainer $olddir not writeable");
        }
-       return 1;
+     }
+     if ($verbose==1) {
+       $this->message("Renamed server folder $olddir to $newdir");
      }
 
      # Rename database+user, metadata:  
      # 7.10.2015: disabled since the drupal settings.php would also need to be adapted
      # so the db/user will always have the "old" name, but can be found in the docker and meta env.
      #$this->extdb('rename', 1, $newname); 
+
+     # b) rename container
+     $manager->rename($container, $newname);
+
+     # c) rename metadata
+     $this->website->field_hostname['und'][0]['value'] = $newname;
+     node_save($this->website);     // Save the updated node
+     $this->website=node_load($this->website->nid);  # reload cache
+     if ($verbose==1) {
+       $this->message("Renamed container and meta data hostname"); ##
+     }
 
      # Update object with new name, run with apropriate params
      $this->id=$newname;
@@ -490,8 +490,9 @@ END;
 
      # re-make the container: 7.10.2015: disabled, do a level higher
      #$this->rebuildContainer($newname, $verbose);  
+
      if ($verbose==1) {
-       $this->message('done');
+       $this->message('done. Rebuild may still be needed.');
      }
   }
 
@@ -617,14 +618,13 @@ END;
         }
       }
       if (variable_get('webfact_data_volume', 1) == 1 ) {
-        $mount = '/data';     //  todo: make a setting?
+        $mount = '/data';     //  todo: make a setting
         $folder = $sitesdir . $this->id . $mount;
         $this->docker_vol[$mount] = array() ; 
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
         if (! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
           if (! mkdir($folder, 0775) ) {
-            #drupal_set_message("Server folder $folder could not be created.");
             watchdog('webfact', 'Server folder ' . $folder .' could not be created, is the parent folder writeable?');
           }
         }
@@ -638,7 +638,9 @@ END;
         if (! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
           if (! mkdir($folder, 0775) ) {
-            drupal_set_message("Server folder $folder could not be created.");
+            # log, but not to UI
+            #drupal_set_message("Server folder $folder could not be created.", 'warning');
+            watchdog('webfact', 'Server folder ' . $folder .' could not be created');
           }
         }
       }
@@ -957,17 +959,23 @@ END;
   }
 
 
+  /*
+   * log to the screen (and currently) watchdog
+   */
   public function message($msg, $status='status', $msglevel=1) {
     if (($msglevel==1) && ($this->msglevel1)) {
        drupal_set_message($msg, $status);
+       watchdog('webfact', $msg);
     }
     if (($msglevel==2) && ($this->msglevel2)) {
        drupal_set_message($msg, $status);
+       watchdog('webfact', $msg);
     }
     if (($msglevel==3) && ($this->msglevel3)) {
        drupal_set_message($msg, $status);
+       watchdog('webfact', $msg);
     }
-    // else stay silent
+    // else 
   }
 
 
@@ -1119,7 +1127,8 @@ END;
         $this->message("Cannot connect to database (host=$mysqlhost, user=$mysqluser)", 'error');
       }
       watchdog('webfact', "extdb(): Cannot connect to database (host=$mysqlhost, user=$mysqluser)", array(), WATCHDOG_ERROR);
-      return 0;
+      throw new Exception("extdb(): Cannot connect to database (host=$mysqlhost, user=$mysqluser)");
+      return 1;
     }
 
     // create/delete the DB
@@ -1231,7 +1240,7 @@ END;
 #dpm($this->website->field_docker_environment['und']);
 #dpm($this->docker_env);
     $conn->close();
-    return 1;
+    return 0;
   }
 
 
@@ -2596,10 +2605,14 @@ END;
         if (! isset ($_url['query']['newname']) ) {
           break;
         }
-        #dpm($_url['query']);
-        $newname = check_plain($_url['query']['newname']);   // security
-        $newname = preg_replace('/[^A-Za-z0-9]/', '', strtolower($newname));
-        $this->renameContainer($this->id, $newname, 1);  // 1=verbose messages to UI
+        try {
+          #dpm($_url['query']);
+          $newname = check_plain($_url['query']['newname']);   // security
+          $newname = preg_replace('/[^A-Za-z0-9]/', '', strtolower($newname));
+          $this->renameContainer($this->id, $newname, 1);  // 1=verbose messages to UI
+        } catch (Exception $e) {
+          $this->message($e->getMessage(), 'error', 1);
+        }
         drupal_goto("/website/advanced/$this->nid"); // jump back to  status
         break;
 

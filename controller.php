@@ -427,11 +427,24 @@ END;
   /*
    * rename a container
    * no checking of permissions,
-   * TODO: check for name conflict, i.e. newname does not already exist! XX
    */
   protected function renameContainer($old, $newname, $verbose) {
      watchdog('webfact', "renameContainer $old to $newname" . ' by ' . $this->user);
+     $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
+     $olddir = $sitesdir . $old;
+     $newdir = $sitesdir . $newname;
      $manager = $this->getContainerManager();
+
+     // check for name conflict, i.e. newname does not already exist
+     $container = $manager->find($newname);
+     if ($container) {
+       throw new Exception("renameContainer: $newname already exists.");
+     }
+     if ( file_exists($newdir) ) {
+       throw new Exception("renameContainer: A server folder $newdir already exists");
+     }
+
+     // get the current container and stop it
      $container = $manager->find($old);
      if (!$container) {
        watchdog('webfact', "renameContainer $old - no such container");
@@ -439,16 +452,12 @@ END;
           $this->message("$old does not exist");
        }
        throw new Exception("renameContainer $old - no such container");
-       return 1;
      }
      if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
        $manager->stop($container);
      }
 
      # a) Rename server folder
-     $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
-     $olddir = $sitesdir . $old;
-     $newdir = $sitesdir . $newname;
      if ( file_exists($olddir) && is_writable($olddir) ) {
        if ( rename($olddir, $newdir) ) {
          watchdog('webfact', "renameContainer $olddir renamed to $newdir");

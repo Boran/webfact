@@ -1038,25 +1038,24 @@ END;
    * the website database can be external, as opposed to being inside the container.
    * When inside the container, the boran/drupal image takes care of db creation, but if
    * external, webfact needs to create a new database
-   * params: new DB and user name, verbose messages.
+   * params: action, verbose messages.
    *         newname: when renaming, new container (+db) name
+   *         others values are pullled from $this.
    */
   private function extdb($action='create', $verbose=1, $newname='') {
     if (variable_get('webfact_manage_db',0) == 0) {
       return 1;    // do not manage DB
     }
+
     if (! isset($this->id) ) {
-      watchdog('webfact', 'extdb ' . $action . ', Error: no website id set');
-      return 1;  
+      throw new Exception("extdb: " . $action . ', Error: no website id set');
     }
     if (! isset($this->nid) ) {
-      watchdog('webfact', 'extdb ' . $action . ', Error: no website nid set');
-      return 1;  
+      throw new Exception("extdb: " . $action . ', Error: no website nid set');
     }
     $this->website = node_load($this->nid);
     if ($this->website==null) {
-      $this->message("extdb: node $this->nid not found", 'error');
-      return 1;
+      throw new Exception("extdb: node " . $this->nid . ' not found');
     }
 
     watchdog('webfact', $action . ' database, update mysql settings to the docker env field for ' . $this->id);
@@ -1132,12 +1131,9 @@ END;
     $conn = new mysqli($mysqlhost, $mysqluser, $mysqlpw, 'mysql');
     if ($conn->connect_error) {
       if ($verbose==1) {
-        #trigger_error('Database connection failed: '  . $conn->connect_error, E_USER_ERROR);
         $this->message("Cannot connect to database (host=$mysqlhost, user=$mysqluser)", 'error');
       }
-      watchdog('webfact', "extdb(): Cannot connect to database (host=$mysqlhost, user=$mysqluser)", array(), WATCHDOG_ERROR);
-      throw new Exception("extdb(): Cannot connect to database (host=$mysqlhost, user=$mysqluser)");
-      return 1;
+      throw new Exception("extdb: Cannot connect to database (host=$mysqlhost, user=$mysqluser)");
     }
 
     // create/delete the DB
@@ -1154,13 +1150,13 @@ END;
         if ($verbose==1) {
           $this->message($conn->error, 'warning');
         }
-        watchdog('webfact', "extdb: delete db ($cmd): " . $conn->error, array(), WATCHDOG_ERROR);
+        throw new Exception("extdb: delete db ($cmd): " . $conn->error);
       }
       watchdog('webfact', "extdb: deleted db $newdb, user $newuser");
 
-    } else if ($action == 'rename') {
-      // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
-      // 2015.10.07: feature not used any more
+    } else if ($action == 'rename') { // 2015.10.07: feature not used any more
+      // naming convention for DB & usernames: 
+      // add a prefix to avoid mysql restrictions
       $renameuser = 'u_' . $newname;
       if (strlen($renameuser) > 16) {   // trim username
         $renameuser = substr($renameuser, 0, 15);
@@ -1173,45 +1169,10 @@ END;
         if ($verbose==1) {
           $this->message($conn->error, 'warning');
         }
-        watchdog('webfact', "extdb: rename db ($cmd): " . $conn->error, array(), WATCHDOG_ERROR);
+        throw new Exception("extdb: rename db ($cmd): " . $conn->error);
       }
     }
     
-/*
-    // a) update existing values
-    $i=0; $found=0;
-    if (!empty($this->website->field_docker_environment['und']) ) {
-      foreach ($this->website->field_docker_environment['und'] as $row) {
-        if ( preg_match("/MYSQL_DATABASE=(.+)/", $row['safe_value'], $matches) ) {
-          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_DATABASE=$newdb";
-          $found=1;
-          #dpm($this->website->field_docker_environment['und'][$i]['value']);
-        }
-        if ( preg_match("/MYSQL_USER=(.+)/", $row['safe_value'], $matches) ) {
-          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_USER=$newuser";
-          $found=1;
-          #dpm($this->website->field_docker_environment['und'][$i]['value']);
-        }
-        if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
-          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_PASSWORD=$pw";
-          $found=1;
-          #dpm($this->website->field_docker_environment['und'][$i]['value']);
-        }
-        $i++;
-      }
-    }
-    // b) create new values
-    // TODO: existing enviroment settings will be overwritten, need to add to the end?
-    if ($found == 0) {
-      $this->website->field_docker_environment['und'][0]['value'] = "MYSQL_DATABASE=$newdb";
-      $this->website->field_docker_environment['und'][1]['value'] = "MYSQL_USER=$newuser";
-      $this->website->field_docker_environment['und'][2]['value'] = "MYSQL_PASSWORD=$pw";
-    }
-    $this->website->revision = 1;    // history of changes
-    $this->website->log = "change mysql settings from extdb(), by $this->user on " . date('c');
-    node_save($this->website);     // Save the updated node
-    $this->website=node_load($this->website->nid);  # reload cache
-*/
 
     // Create or update docker env with DB settings
     $foundhost=$founddb=$founduser=$foundpass=0;
@@ -1246,8 +1207,8 @@ END;
       $this->docker_env[] = "MYSQL_PASSWORD=$pw";
     }
     
-#dpm($this->website->field_docker_environment['und']);
-#dpm($this->docker_env);
+    #dpm($this->website->field_docker_environment['und']);
+    #dpm($this->docker_env);
     $conn->close();
     return 0;
   }
@@ -1809,7 +1770,6 @@ END;
 
       else if ($this->action=='create') {
         $this->extdb('create', $verbose);  // if an an external DB is needed
-        // todo: abort here if return=false?
 
         // create the container
         $config = ['Image'    => $this->cont_image, 

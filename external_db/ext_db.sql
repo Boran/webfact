@@ -54,7 +54,6 @@ END//
 -- Tomer Altman (taltman@ai.sri.com) http://stackoverflow.com/questions/67093/how-do-i-quickly-rename-a-mysql-database-change-schema-name
 -- Webfactory: We call it RenameAppDB() rather than rename_db(). Adapted to rename user too.
 
-
 delimiter //
 DROP PROCEDURE IF EXISTS RenameAppDB;
 CREATE PROCEDURE RenameAppDB(IN old_db VARCHAR(100), IN new_db VARCHAR(100), IN old_user VARCHAR(50), new_user VARCHAR(50))

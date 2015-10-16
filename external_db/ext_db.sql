@@ -1,7 +1,7 @@
 #
-# Stored procedure to allow create user+database and grant access to it
+# Stored procedures for webfactory DB management
 # Useful on an external database (not within the container)
-# Allow access from any client (assume a firewall restricts access)
+# Allows DB access from any client (assume a firewall restricts access)
 #
 # Original snippit: http://superuser.com/questions/424476/grant-mysql-user-ability-to-create-databases-and-only-allow-them-to-access-thos#424493
 #
@@ -48,12 +48,11 @@ BEGIN
 END//
 
 
--- stored procedure rename_db: Rename a database my means of table copying.
+-- Webfactory: We call it RenameAppDB() rather than rename_db(). Adapted to rename user too.
+-- stored procedure rename_db: Rename a database by means of table copying.
 -- Will clobber any existing database with the same name as the 'new' database name.
 -- Only copies tables; stored procedures, views, triggers and other db objects are not copied.
--- Tomer Altman (taltman@ai.sri.com) http://stackoverflow.com/questions/67093/how-do-i-quickly-rename-a-mysql-database-change-schema-name
--- Webfactory: We call it RenameAppDB() rather than rename_db(). Adapted to rename user too.
-
+-- Tomer Altman http://stackoverflow.com/questions/67093/how-do-i-quickly-rename-a-mysql-database-change-schema-name
 
 delimiter //
 DROP PROCEDURE IF EXISTS RenameAppDB;

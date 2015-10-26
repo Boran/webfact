@@ -930,8 +930,8 @@ END;
    
     // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
     $newuser = 'u_' . $this->id;
-    if (strlen($newuser) > 16) {   // trim username
-      $newuser = substr($newuser, 0, 15);
+    if (strlen($newuser) > 16) {   // trim username, mysql only allows 16 chars before 5.7.8, later 32
+      $newuser = substr($newuser, 0, 16);
     }
     $newdb = 'd_' . $this->id; 
 

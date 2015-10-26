@@ -20,7 +20,7 @@ use Docker\Exception\ImageNotFoundException;
  * encapsulate the Webfactory stuff into a calls, for easier Drupal7/8 porting
  */
 class WebfactController {
-  protected $client, $hostname, $nid, $id, $markup, $result, $status, $docker;
+  protected $client, $hostname, $nid, $id, $did, $markup, $result, $status, $docker;
   protected $config, $user, $website, $des, $category;
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $cont_mem, $dserver, $fserver, $loglines, $env_server; // settings
@@ -242,6 +242,7 @@ END;
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild4_msg')">Rebuild with persistence</a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
+                  <li class="divider"></li>
                   <li><a href="$wpath/cocopyfile/$this->nid">Folder download</a></li>
       <!--        <li><a href="$wpath/couploadfile/$this->nid">File Upload</a></li>   -->
                 </ul>
@@ -311,7 +312,6 @@ END;
 
   /*
    * delete a container by name and its external DB 
-   * todo: this is an experimental abstraction, initially used in hook_node_delete()
    * no checking of permissions,
    */
   public function deleteContainer($nid, $name) {
@@ -355,8 +355,17 @@ END;
        watchdog('webfact', "deleteContainerData - container must be running");
        return;
      }
+     watchdog('webfact', "deleteContainerData $name /data and " . $this->webroot);
      $cmd = 'cd ' . $this->webroot . ' && rm -rf * .[a-zA-Z0-9]* ';
      $logs = $this->runCommand($cmd);
+     $cmd = 'cd /data && rm -rf * .[a-zA-Z0-9]* ';
+     $logs = $this->runCommand($cmd);
+
+     $serverdir = variable_get('webfact_server_sitesdir', '/opt/sites/') . $this->id;
+     watchdog('webfact', "remove top directories $serverdir");
+     if (! rmdir($serverdir . '/www') )  { watchdog('webfact', "cannot delete " . $serverdir . '/www'); }
+     if (! rmdir($serverdir . '/data') ) { watchdog('webfact', "cannot delete " . $serverdir . '/data'); }
+     if (! rmdir($serverdir          ) ) { watchdog('webfact', "cannot delete " . $serverdir          ); }
      watchdog('webfact', "deleteContainerData $name - " . $this->webroot);
      return($logs);      // todo: review
   }
@@ -375,24 +384,127 @@ END;
      watchdog('webfact', "stopContainer $name - done");
   }
 
+  // todo: should be protected, due to $this
+  public function startContainer($name) {
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+     if (!$container) {
+       watchdog('webfact', "startContainer $name - no such container");
+       return;
+     }
+     if  ($container->getRuntimeInformations()['State']['Running'] == FALSE) {
+       #$manager->start($container);
+       $manager->start($container, $this->startconfig);
+     }
+     watchdog('webfact', "startContainer $name - done");
+  }
+
+
+  /*
+   * rebuild: stop, delete, create
+   */
+  protected function rebuildContainer ($name, $verbose=0) {
+     $manager = $this->getContainerManager();
+     $container = $manager->find($name);
+     if (!$container) {
+       watchdog('webfact', "rebuildContainer $name - no such container");
+       return;
+     }
+
+     #$this->backupContainer($name);
+     if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+       $manager->stop($container);
+     }
+     $manager->remove($container);
+     $this->arguments('create', $this->nid, 0);  // verbose=0
+     watchdog('webfact', "rebuildContainer $name - done");
+     if ($verbose==1) {
+       $this->message('Container deleted and recreated');
+     }
+  }
+
 
   /*
    * rename a container
    * no checking of permissions,
    */
-  public function renameContainer($old, $new) {
+  protected function renameContainer($old, $newname, $verbose) {
+     watchdog('webfact', "renameContainer $old to $newname" . ' by ' . $this->user);
+     $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
+     $olddir = $sitesdir . $old;
+     $newdir = $sitesdir . $newname;
      $manager = $this->getContainerManager();
+
+     // check for name conflict, i.e. newname does not already exist
+     $container = $manager->find($newname);
+     if ($container) {
+       throw new Exception("renameContainer: $newname already exists.");
+     }
+     if ( file_exists($newdir) ) {
+       throw new Exception("renameContainer: A server folder $newdir already exists");
+     }
+
+     // get the current container and stop it
      $container = $manager->find($old);
      if (!$container) {
        watchdog('webfact', "renameContainer $old - no such container");
-       return;
+       if ($verbose==1) {
+          $this->message("$old does not exist");
+       }
+       throw new Exception("renameContainer $old - no such container");
      }
      if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
        $manager->stop($container);
      }
-     $manager->rename($container, $new);
-     watchdog('webfact', "renameContainer $old to $new" . ' by ' . $this->user);
+
+     # a) Rename server folder
+     if ( file_exists($olddir) && is_writable($olddir) ) {
+       if ( rename($olddir, $newdir) ) {
+         watchdog('webfact', "renameContainer $olddir renamed to $newdir");
+       } else {
+         throw new Exception("renameContainer: error $olddir to $newdir");
+       }
+     } else {
+       if ( ! file_exists($olddir) ) {
+         throw new Exception("renameContainer $olddir does not exist");
+       }
+       if ( ! is_writable($olddir) ) {
+         throw new Exception("renameContainer $olddir not writeable");
+       }
+     }
+     if ($verbose==1) {
+       $this->message("Renamed server folder $olddir to $newdir");
+     }
+
+     # Rename database+user, metadata:  
+     # 7.10.2015: disabled since the drupal settings.php would also need to be adapted
+     # so the db/user will always have the "old" name, but can be found in the docker and meta env.
+     #$this->extdb('rename', 1, $newname); 
+
+     # b) rename container
+     $manager->rename($container, $newname);
+
+     # c) rename metadata
+     $this->website->field_hostname['und'][0]['value'] = $newname;
+     node_save($this->website);     // Save the updated node
+     $this->website=node_load($this->website->nid);  # reload cache
+     if ($verbose==1) {
+       $this->message("Renamed container and meta data hostname"); ##
+     }
+
+     # Update object with new name, run with apropriate params
+     $this->id=$newname;
+     $this->load_meta();
+     $this->startContainer($newname);
+
+     # re-make the container: 7.10.2015: disabled, do a level higher
+     #$this->rebuildContainer($newname, $verbose);  
+
+     if ($verbose==1) {
+       $this->message('done. Rebuild may still be needed.');
+     }
   }
+
 
   /*
    * backup a container (commit an image)
@@ -428,8 +540,10 @@ END;
      $this->extdb('create', $verbose);  // if an an external DB is needed
 
      // create the container
-        $config = ['Image'=> $this->cont_image, 'Hostname' => $this->fqdn,
-                   'Env'  => $this->docker_env, 'Volumes'  => $this->docker_vol
+        $config = ['Image'=> $this->cont_image, 
+                   # dont use anymore: 'Hostname' => $this->fqdn,
+                   'Env'  => $this->docker_env, 
+                   'Volumes'  => $this->docker_vol
         ];
         #dpm($config);
         $container= new Docker\Container($config);
@@ -500,6 +614,10 @@ END;
     if ($this->is_drupal == 1) { 
       // Create a volume mount point automatically?
       $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
+      if (empty($sitesdir)) {
+         $sitesdir = '/opt/sites/';
+         variable_set('webfact_server_sitesdir', $sitesdir);
+      }
       if (! file_exists($sitesdir . $this->id) ) {
         if ((variable_get('webfact_data_volume', 1) == 1 ) || (variable_get('webfact_www_volume', 1) == 1 ) ) {
       
@@ -509,14 +627,13 @@ END;
         }
       }
       if (variable_get('webfact_data_volume', 1) == 1 ) {
-        $mount = '/data';     //  todo: make a setting?
+        $mount = '/data';     //  todo: make a setting
         $folder = $sitesdir . $this->id . $mount;
         $this->docker_vol[$mount] = array() ; 
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
         if (! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
           if (! mkdir($folder, 0775) ) {
-            #drupal_set_message("Server folder $folder could not be created.");
             watchdog('webfact', 'Server folder ' . $folder .' could not be created, is the parent folder writeable?');
           }
         }
@@ -530,7 +647,9 @@ END;
         if (! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
           if (! mkdir($folder, 0775) ) {
-            drupal_set_message("Server folder $folder could not be created.");
+            # log, but not to UI
+            #drupal_set_message("Server folder $folder could not be created.", 'warning');
+            watchdog('webfact', 'Server folder ' . $folder .' could not be created');
           }
         }
       }
@@ -780,7 +899,7 @@ END;
   }
 
   /*
-   * get the status withing the container, from webfact_status.sh
+   * get the status within the container, from webfact_status.sh
    */
   public function getContainerStatus() {
     // todo: make the command a parameter?
@@ -849,17 +968,23 @@ END;
   }
 
 
+  /*
+   * log to the screen (and currently) watchdog
+   */
   public function message($msg, $status='status', $msglevel=1) {
     if (($msglevel==1) && ($this->msglevel1)) {
        drupal_set_message($msg, $status);
+       watchdog('webfact', $msg);
     }
     if (($msglevel==2) && ($this->msglevel2)) {
        drupal_set_message($msg, $status);
+       watchdog('webfact', $msg);
     }
     if (($msglevel==3) && ($this->msglevel3)) {
        drupal_set_message($msg, $status);
+       watchdog('webfact', $msg);
     }
-    // else stay silent
+    // else 
   }
 
 
@@ -913,62 +1038,105 @@ END;
    * the website database can be external, as opposed to being inside the container.
    * When inside the container, the boran/drupal image takes care of db creation, but if
    * external, webfact needs to create a new database
-   * params: new DB and user name, verbose messages.
+   * params: action, verbose messages.
+   *         newname: when renaming, new container (+db) name
+   *         others values are pullled from $this.
    */
-  private function extdb($action='create', $verbose=1) {
+  private function extdb($action='create', $verbose=1, $newname='') {
     if (variable_get('webfact_manage_db',0) == 0) {
       return 1;    // do not manage DB
     }
+
     if (! isset($this->id) ) {
-      watchdog('webfact', 'extdb ' . $action . ', Error: no website id set');
-      return 1;  
+      throw new Exception("extdb: " . $action . ', Error: no website id set');
     }
     if (! isset($this->nid) ) {
-      watchdog('webfact', 'extdb ' . $action . ', Error: no website nid set');
-      return 1;  
+      throw new Exception("extdb: " . $action . ', Error: no website nid set');
     }
-   
-    // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
-    $newuser = 'u_' . $this->id;
-    if (strlen($newuser) > 16) {   // trim username, mysql only allows 16 chars before 5.7.8, later 32
-      $newuser = substr($newuser, 0, 16);
+    $this->website = node_load($this->nid);
+    if ($this->website==null) {
+      throw new Exception("extdb: node " . $this->nid . ' not found');
     }
-    $newdb = 'd_' . $this->id; 
 
-    watchdog('webfact', $action . ' database and write mysql settings to the docker env field for ' . $newdb);
+    watchdog('webfact', $action . ' database, update mysql settings to the docker env field for ' . $this->id);
     $mysqlhost=variable_get('webfact_manage_db_host');
     $mysqluser=variable_get('webfact_manage_db_user');
     $mysqlpw=variable_get('webfact_manage_db_pw');
 
-    $this->website = node_load($this->nid);
-    if ($this->website==null) {
-      $this->message("extdb: node $this->nid not found", 'error');
-      return;
+    $nodechanged=0;
+    // get current mysql database if there is one
+    if (!empty($this->website->field_docker_environment['und']) ) {
+      foreach ($this->website->field_docker_environment['und'] as $row) {
+        if ( preg_match("/MYSQL_DATABASE=(.+)/", $row['safe_value'], $matches) ) {
+          $newdb=$matches[1];   // override default
+          watchdog('webfact', "use existing mysql db $newdb");
+        }
+      }
+    } 
+    if (empty($newdb)) {   // else new
+      // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
+      $newdb = 'd_' . $this->id;
+      #$this->website->field_docker_environment['und'][0]['value'] = "MYSQL_DATABASE=$newdb";
+      $this->website->field_docker_environment['und'][]['value'] = "MYSQL_DATABASE=$newdb";
+      $nodechanged=1;
     }
+
+    // get current mysql user if there is one
+    if (!empty($this->website->field_docker_environment['und']) ) {
+      foreach ($this->website->field_docker_environment['und'] as $row) {
+        if ((isset($row['safe_value'])) && ( preg_match("/MYSQL_USER=(.+)/", $row['safe_value'], $matches) ) ) {
+          $newuser=$matches[1];
+          watchdog('webfact', "use existing mysql user $newuser");
+        }
+      }
+    } 
+    if (empty($newuser)) {   // else new
+      // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
+      $newuser = 'u_' . $this->id;
+      if (strlen($newuser) > 16) {   // trim username
+        $newuser = substr($newuser, 0, 15);
+      }
+      #$this->website->field_docker_environment['und'][1]['value'] = "MYSQL_USER=$newuser";
+      $this->website->field_docker_environment['und'][]['value'] = "MYSQL_USER=$newuser";
+      $nodechanged=1;
+    }
+
+
     // get current mysql password, if there is one, from the website node
     if (!empty($this->website->field_docker_environment['und']) ) {
       foreach ($this->website->field_docker_environment['und'] as $row) {
         if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
-          $pw=$matches[1];   // override default
+          $pw=$matches[1]; 
           watchdog('webfact', 'use existing mysql password');
         }
       }
-    } else {
+    } 
+    if (empty($pw)) {   // else new
       // generate a password (todo: improve randomness?)
       $pw = substr(md5(uniqid()), 0, 8); 
+      #$this->website->field_docker_environment['und'][2]['value'] = "MYSQL_PASSWORD=$pw";
+      $this->website->field_docker_environment['und'][]['value'] = "MYSQL_PASSWORD=$pw";
+      $nodechanged=1;
     }
 
+    if ($nodechanged==1) { 
+      watchdog('webfact', 'save the new mysql settings to the node');
+      $this->website->revision = 1;    // history of changes
+      $this->website->log = "change mysql settings from extdb(), by $this->user on " . date('c');
+      node_save($this->website);     // Save the updated node
+      $this->website=node_load($this->website->nid);  # reload cache
+    }
+
+    // connect to mysql instance
     $conn = new mysqli($mysqlhost, $mysqluser, $mysqlpw, 'mysql');
     if ($conn->connect_error) {
       if ($verbose==1) {
-        #trigger_error('Database connection failed: '  . $conn->connect_error, E_USER_ERROR);
         $this->message("Cannot connect to database (host=$mysqlhost, user=$mysqluser)", 'error');
       }
-      watchdog('webfact', "extdb: Cannot connect to database (host=$mysqlhost, user=$mysqluser)", array(), WATCHDOG_ERROR);
-      return 0;
+      throw new Exception("extdb: Cannot connect to database (host=$mysqlhost, user=$mysqluser)");
     }
 
-    // actually create/delete the DB
+    // create/delete the DB
     if ($action == 'create') {
       if (!$conn->query("call CreateAppDB('$newdb', '$newuser', '$pw')")) {
         if ($verbose==1) {
@@ -982,64 +1150,78 @@ END;
         if ($verbose==1) {
           $this->message($conn->error, 'warning');
         }
-        watchdog('webfact', "extdb: delete db ($cmd): " . $conn->error, array(), WATCHDOG_ERROR);
+        throw new Exception("extdb: delete db ($cmd): " . $conn->error);
       }
       watchdog('webfact', "extdb: deleted db $newdb, user $newuser");
-    }
-    
-    // save the mysql values to the node
-    // a) update existing values
-    $i=0; $found=0;
-    if (!empty($this->website->field_docker_environment['und']) ) {
-      foreach ($this->website->field_docker_environment['und'] as $row) {
-        if ( preg_match("/MYSQL_DATABASE=(.+)/", $row['safe_value'], $matches) ) {
-          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_DATABASE=$newdb";
-          $found=1;
-          #dpm($this->website->field_docker_environment['und'][$i]['value']);
+
+    } else if ($action == 'rename') { // 2015.10.07: feature not used any more
+      // naming convention for DB & usernames: 
+      // add a prefix to avoid mysql restrictions
+      $renameuser = 'u_' . $newname;
+      if (strlen($renameuser) > 16) {   // trim username
+        $renameuser = substr($renameuser, 0, 15);
+      }
+      $renamedb = 'd_' . $newname;
+      watchdog('webfact', "extdb() rename $newdb to $renamedb and $newuser to $renameuser");
+      $this->message("Rename database $newdb to $renamedb and user $newuser to $renameuser");
+      $cmd="call RenameAppDB ('$newdb', '$renamedb', '$newuser', '$renameuser')";
+      if (!$conn->query($cmd)) {
+        if ($verbose==1) {
+          $this->message($conn->error, 'warning');
         }
-        if ( preg_match("/MYSQL_USER=(.+)/", $row['safe_value'], $matches) ) {
-          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_USER=$newuser";
-          $found=1;
-          #dpm($this->website->field_docker_environment['und'][$i]['value']);
-        }
-        if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
-          $this->website->field_docker_environment['und'][$i]['value'] = "MYSQL_PASSWORD=$pw";
-          $found=1;
-          #dpm($this->website->field_docker_environment['und'][$i]['value']);
-        }
-        $i++;
+        throw new Exception("extdb: rename db ($cmd): " . $conn->error);
       }
     }
-    // b) create new values
-    // TODO: existing enviroment settings will be overwritten, need to add to the end?
-    if ($found == 0) {
-      $this->website->field_docker_environment['und'][0]['value'] = "MYSQL_DATABASE=$newdb";
-      $this->website->field_docker_environment['und'][1]['value'] = "MYSQL_USER=$newuser";
-      $this->website->field_docker_environment['und'][2]['value'] = "MYSQL_PASSWORD=$pw";
+    
+
+    // Create or update docker env with DB settings
+    $foundhost=$founddb=$founduser=$foundpass=0;
+    foreach ($this->docker_env as $key => $row) {
+      if ( preg_match("/MYSQL_HOST=(.+)/", $row, $matches) ) {
+        $this->docker_env[$key] = "MYSQL_HOST=$mysqlhost";
+        $foundhost=1;
+      }
+      if ( preg_match("/MYSQL_DATABASE=(.+)/", $row, $matches) ) {
+        $this->docker_env[$key] = "MYSQL_DATABASE=$newdb";
+        $founddb=1;
+      }
+      if ( preg_match("/MYSQL_USER=(.+)/", $row, $matches) ) {
+        $this->docker_env[$key] = "MYSQL_USER=$newuser";
+        $founduser=1;
+      }
+      if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row, $matches) ) {
+        $this->docker_env[$key] = "MYSQL_PASSWORD=$pw";
+        $foundpass=1;
+      }
     }
-    $this->website->revision = 1;    // history of changes
-    $this->website->log = "change mysql settings after db creation, by $this->user on " . date('c');
-    node_save($this->website);     // Save the updated node
-    $this->website=node_load($this->website->nid);  # reload cache
-
-
-    // finally tell the container that the DB is external
-    $this->docker_env[] = "MYSQL_HOST=$mysqlhost";
-    $this->docker_env[] = "MYSQL_DATABASE=$newdb";
-    $this->docker_env[] = "MYSQL_USER=$newuser";
-    $this->docker_env[] = "MYSQL_PASSWORD=$pw";
+    if ($foundhost==0) {  // current not found, add a new one
+      $this->docker_env[] = "MYSQL_HOST=$mysqlhost";
+    }
+    if ($founddb==0) {  
+      $this->docker_env[] = "MYSQL_DATABASE=$newdb";
+    }
+    if ($founduser==0) {  
+      $this->docker_env[] = "MYSQL_USER=$newuser";
+    }
+    if ($foundpass==0) {  
+      $this->docker_env[] = "MYSQL_PASSWORD=$pw";
+    }
+    
+    #dpm($this->website->field_docker_environment['und']);
     #dpm($this->docker_env);
     $conn->close();
-    return 1;
+    return 0;
   }
 
 
+  /*
+   *
+   */
   protected function contAction($verbose=1) {
     #watchdog('webfact', "contAction() $this->action");
     try {
       $manager = $this->docker->getContainerManager();
       $container = $manager->find($this->id);
-
 
       // delete meta data and container
       if ($this->action=='deleteall') {
@@ -1588,11 +1770,10 @@ END;
 
       else if ($this->action=='create') {
         $this->extdb('create', $verbose);  // if an an external DB is needed
-        // todo: abort here if return=false?
 
         // create the container
         $config = ['Image'    => $this->cont_image, 
-                   'Hostname' => $this->fqdn,
+                   # Dont use any more: 'Hostname' => $this->fqdn,
                    'Env'      => $this->docker_env, 
                    //'Volumes'  => [ '/data' => array() ],
                    'Volumes'  => $this->docker_vol,
@@ -2353,12 +2534,21 @@ END;
 <!-- Bootstrap: -->
 <form >
 <fieldset>
-<legend>Change the name of a container</legend>
-<p>The docker container and metadata hostname will be renamed and the server /data mount-point moved. However:<p>
+<legend>Renaming a container</legend>
 <ul>
-<li>The hostname within the container is not renamed (e.g. may affect outgoing emails, website headers, etc.)</li>
-<li>External databases (if used) are not renamed </li>
-<li>Docker environment variables such AS VIRTUAL_HOST are unchanged. So, for example, the Nginx reverse proxy will not be able to map to the container web port. To fix VIRTUAL_HOST, do a 'Rebuild with persistence' after renaming (note that the docker image for the container will then be image made before the rebuild, not the original image).</p>
+<li>The docker container and metadata hostname will be renamed</li>
+<li>The server mount-point moved (for /data and /var/www/html)</li>
+</ul>
+<p>Notes:</p>
+<ul>
+<li>Names within the container is not changed (e.g. may affect outgoing emails, website titles/headers, etc.)</li>
+<li>The DB is not renamed (so apps such as drupal continue to accedd the saame DB)</li>
+</ul>
+<p>After renaming you probably need to rebuild the container too:</p>
+<ul>
+<li>Deleting and re-creating the container (so that Docker environment variables such AS VIRTUAL_HOST are updated for reverse proxies). The environment variables in the metadata are passed to docker.</li>
+<li>Warning: only do this for containers where data is persistent (mounted volumes/external DB) !</li>
+</ul
 <!-- Button -->
 <div class="col-xs-2">
   <div class="control-group">
@@ -2372,7 +2562,7 @@ END;
   <div class="control-group">
     <div class="controls">
       <input id="textinput-0" name="newname" type="text" placeholder="" class="input-xxlarge">
-      <p class="help-block">New name  for the container, and hence the Website URL. e.g. a-z0-9 'mysite4'</p>
+      <p class="help-block">New name for the container (excluding the domain), and hence the Website URL. e.g. 'mysite0'</p>
     </div>
   </div>
 </div>
@@ -2384,35 +2574,15 @@ END;
         if (! isset ($_url['query']['newname']) ) {
           break;
         }
-        #dpm($_url['query']);
-        $newname = check_plain($_url['query']['newname']);   // security
-        $newname = preg_replace('/[^A-Za-z0-9]/', '', strtolower($newname));
-        $container = $manager->find($this->id);
-        if (! $container) {
-          $this->message("$this->id does not exist");
-          break;
+        try {
+          #dpm($_url['query']);
+          $newname = check_plain($_url['query']['newname']);   // security
+          $newname = preg_replace('/[^A-Za-z0-9]/', '', strtolower($newname));
+          $this->renameContainer($this->id, $newname, 1);  // 1=verbose messages to UI
+        } catch (Exception $e) {
+          $this->message($e->getMessage(), 'error', 1);
         }
-        watchdog('webfact', "corename: Rename container and meta hostname from $this->id to $newname");
-        # a) rename container
-        $this->renameContainer($this->id, $newname);
-        # b) rename metadata
-        $this->website->field_hostname['und'][0]['value'] = $newname;
-        node_save($this->website);     // Save the updated node
-        $this->website=node_load($this->website->nid);  # reload cache
-        # c) Rename server folder
-        $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
-	$olddir = $sitesdir . $this->id;
-	$newdir = $sitesdir . $newname;
-        if ( file_exists($olddir) && is_writable($olddir) ) {
-	  drupal_set_message("Rename server folder (for container /data mount) $olddir renamed to $newdir");
-	  if ( rename($olddir, $newdir) ) {
-            watchdog('webfact', "corename: renamed $olddir renamed to $newdir");
-	  }
-        } else {
-          watchdog('webfact', "corename: warning $olddir does not exist or was not writeable");
-        }
-        $this->message("done");
-        drupal_goto("/website/advanced/$this->nid"); // show new status
+        drupal_goto("/website/advanced/$this->nid"); // jump back to  status
         break;
 
 

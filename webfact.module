@@ -118,8 +118,8 @@ function webfact_admin_settings() {
 
   $form['webfact_fieldset_server']['webfact_server_sitesdir'] = array(
     '#title' => t('A folder for container mountpoints'),
-    '#default_value' => variable_get('webfact_server_sitesdir', array('')),
-    '#description' => t('Default is /opt/sites/. When new websites are added, a subfolder is created with the site name. e.g. /data in containers could be mapped to /opt/sites/CONTAINERNAME. Note: ensure a trailing slashh.'),
+    '#default_value' => variable_get('webfact_server_sitesdir', array('/opt/sites/')),
+    '#description' => t('Default is /opt/sites/. When new websites are added, a subfolder is created with the site name. e.g. /data in containers could be mapped to /opt/sites/CONTAINERNAME. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
     '#size' => 30,
     '#maxlength' => 100,

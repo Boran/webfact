@@ -24,6 +24,7 @@ class WebfactController {
   protected $config, $user, $website, $des, $category;
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $cont_mem, $dserver, $fserver, $loglines, $env_server; // settings
+  protected $container_api, $mserver, $marathon_name; // marathon api
   protected $is_drupal; // is this a drupal container: enable drupal features
   protected $done_per;  // status value back from a drupal container when build is finished
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
@@ -52,6 +53,7 @@ class WebfactController {
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
     //$this->dserver   = variable_get('webfact_dserver', 'tcp://mydockerserver.example.ch:2375');
     $this->dserver   = variable_get('webfact_dserver', 'unix:///var/run/docker.sock');
+    $this->mserver   = variable_get('webfact_mserver', '');  // marathon api
     $this->fserver   = variable_get('webfact_fserver', 'webfact.example.ch');
     $this->rproxy    = variable_get('webfact_rproxy', 'nginx');
     $this->loglines  = variable_get('webfact_loglines', 300);
@@ -149,7 +151,9 @@ class WebfactController {
     return strtr($matches[1], $map);
   }
 
-
+  /* 
+   * update the "date changed" of a node
+   */
   protected function touch_node_date() { 
     if (!$this->nid) 
       return -1;
@@ -589,9 +593,21 @@ END;
       $this->is_drupal = 0;
     } 
 
+    // Mesos
+    if (!empty($this->website->field_container_api['und'][0]['value']) ) {
+      $this->container_api = $this->website->field_container_api['und'][0]['value'];
+    }
+    if (!empty($this->website->field_marathon_name['und'][0]['safe_value']) ) {
+      $this->marathon_name = $this->website->field_marathon_name['und'][0]['safe_value'];
+    } 
+    if (strlen($this->marathon_name) < 1) {
+      $this->marathon_name = $this->id; // fall back to the hostname
+    }
+
     // Initial docker environment variables
 
     $this->fqdn = $this->id . '.' . $this->fserver;  // e.g. MYHOST.webfact.example.ch
+    //todo mesos: override with marathon_name
 
     if ($this->is_drupal == 1) {
       $this->docker_env = [
@@ -795,6 +811,7 @@ END;
     }
     //  actualy, do not sort the array, to preserve the order of settings, allowing override
     //sort($this->docker_env);
+
 
     if (!empty($this->website->field_docker_restartpolicy['und'][0]) ) {
       $this->restartpolicy= $this->website->field_docker_restartpolicy['und'][0]['value'];
@@ -2207,6 +2224,9 @@ END;
 
 
       case 'advanced':  // just drop through to menu below
+        if ($this->container_api == 1) {
+           dpm('Api=' . $this->container_api . ', marathon_name=' . $this->marathon_name .', mserver=' . $this->mserver); // XX
+        }
         // two ways of updating the status regularly
         // a) browser refresh every yy secs
           #$meta_refresh = array(    // refresh status every minute
@@ -2218,7 +2238,7 @@ END;
           'webfact_site_check' => '1',
           'webfact_nid'        => $this->website->nid,
           //'time_interval'      => 10000, // ms
-          'time_interval'      => 30000, // ms
+          'time_interval'      => 30000, // TODO: make a setting, in ms
         )), 'setting');
         $website_status = '<div class="loader"></div>' . t('Please wait...');
         drupal_add_js(drupal_get_path('module', 'webfact') . '/js/buildstatus.js', 'file');

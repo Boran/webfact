@@ -99,6 +99,14 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
+  $form['webfact_fieldset_server']['webfact_mserver'] = array(
+    '#title' => t('Mesos/Marathon API URL'),
+    '#default_value' => variable_get('webfact_mserver', array('')),
+    '#description' => t('e.g. http://mesos.example.ch:8000. Leave empty if mesos is not used to manage containers'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
   $form['webfact_fieldset_server']['webfact_loglines'] = array(
     '#title' => t('How many lines to tail on logs'),
     '#default_value' => variable_get('webfact_loglines', array('')),
@@ -239,14 +247,14 @@ function webfact_admin_settings() {
   );
   $form['webfact_fieldset_db']['webfact_manage_db_host'] = array(
     '#title' => t('Hostname or IP of the DB server'),
-    '#default_value' => variable_get('webfact_manage_db_host', array('')),
+    '#default_value' => variable_get('webfact_manage_db_host', array('mysql')),
     '#type' => 'textfield',
     '#size' => 30,
     '#maxlength' => 100,
   );
   $form['webfact_fieldset_db']['webfact_manage_db_user'] = array(
     '#title' => t('Sql username'),
-    '#default_value' => variable_get('webfact_manage_db_user', array('')),
+    '#default_value' => variable_get('webfact_manage_db_user', array('webfact_create')),
     '#description' => t('This user must have the right to create DBs'),
     '#type' => 'textfield',
     '#size' => 30,

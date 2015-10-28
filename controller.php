@@ -48,6 +48,7 @@ class WebfactController {
     $this->fqdn = '';
     $this->is_drupal = 1;
     $this->done_per = 100;
+    $this->container_api = 0;
 
     # Load configuration defaults, override in settings.php or on admin/config/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
@@ -313,6 +314,79 @@ END;
       return $nav1 . $nav2 . $navend;
   }
 
+
+
+// XX
+  protected function getContainerDockerStatus() {
+    if (!empty($this->website->field_container_api['und'][0]['value']) ) {
+      $this->container_api = $this->website->field_container_api['und'][0]['value'];
+    }
+    if (!empty($this->website->field_marathon_name['und'][0]['safe_value']) ) {
+      $this->marathon_name = $this->website->field_marathon_name['und'][0]['safe_value'];
+    }
+    if (strlen($this->marathon_name) < 1) {
+      $this->marathon_name = $this->id; // fall back to the hostname
+    }
+
+    if ($this->container_api == 0) {  // docker API
+      // get container and status
+      $manager = $this->getContainerManager();
+      $container = $manager->find($this->id);
+      if ($container==null) {
+        $runstatus = 'unknown';
+        return $runstatus;
+      }
+      $manager->inspect($container);
+      $cont = array();
+      $cont = $container->getRuntimeInformations();
+      if (isset($cont['State'])) {
+        if ($cont['State']['Paused']==1) {
+          $runstatus = 'paused';
+        }
+        else if ($cont['State']['Running']==1) {
+          $runstatus = 'running';
+        }
+        else if ($cont['State']['Restarting']==1) {
+          $runstatus = 'restarting';
+        }
+        else {
+          //dpm($cont['State']);
+          $runstatus = 'stopped';
+        }
+      }
+
+    } else if ($this->container_api == 1) {
+      $runstatus='mesos';
+
+try {
+
+// XX
+$client = new GuzzleHttp\Client();
+$url = $this->mserver . 'v2/apps/' . $this->marathon_name;
+#dpm($url);
+$res = $client->get($url, [ 'auth' => ['user', 'pass'] ]);
+if ($res->getStatusCode()==200) {
+  #dpm($res->getHeader('content-type'));
+  #dpm($res->__toString());
+  #dpm($res->getBody());
+  #dpm($res->json()['app']['tasks'][0]['startedAt']);
+  #dpm($res->json());
+  #if ($response->getBody()) {
+    #dpm($res->json());
+  #}
+  $runstatus.=' ' . $res->json()['app']['tasks'][0]['startedAt'];
+}
+
+}
+finally {
+}
+
+    } else {
+      $runstatus='api-unknown';
+    }
+
+    return $runstatus;
+  }
 
   /*
    * delete a container by name and its external DB 
@@ -897,13 +971,12 @@ END;
     if ($body = $response->getBody()) {
       $body->seek(0);
       $result = $body->read($maxlength); // get first xx bytes
-      
-    #if ($verbose==1 ) {
-    #  dpm($result);
-    #}
-    return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
+      #if ($verbose==1 ) {
+      #  dpm($result);
+      #}
+      return(trim($result, "\x00..\x1F"));  // trim all ASCII control characters
+    }
   }
-}
 
 
   /*
@@ -945,6 +1018,9 @@ END;
     }
     $this->id=$this->website->field_hostname['und'][0]['safe_value'];
 
+// XX
+    $runstatus=$this->getContainerDockerStatus();
+/*
     // get container and status
     $manager = $this->getContainerManager();
     $container = $manager->find($this->id);
@@ -970,6 +1046,7 @@ END;
         $runstatus = 'stopped';
       }
     }
+*/
 
     // grab some more key run info
     #dpm($cont);

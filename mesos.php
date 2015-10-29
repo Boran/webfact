@@ -38,6 +38,78 @@ class Mesos
     }
 
 
+    public function deleteApp() {
+      $url = $this->mserver . 'v2/apps/' . $this->marathon_name;
+      try {
+        $res = $this->client->delete($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '']);
+        dpm( var_export($res->json(), true) );
+        return $res->json();
+      } catch (RequestException $e) {
+          #echo $e->getRequest();
+          if ($e->hasResponse()) {
+              dpm( $e->getResponse()->getStatusCode()
+                . ' ' . $e->getResponse()->getReasonPhrase() 
+                . ': ' . $e->getResponse()->json()['message']  );
+          } 
+      } 
+    }
+
+    public function createApp() {
+      $url = $this->mserver . 'v2/apps';
+      $data = array(
+        'id' => '/drupal1',
+        'cmd' => '/start.sh',
+        'cpus' => 0.5,
+        'mem' => 256.0,
+        'container' => [ 'type' => 'DOCKER',
+          'docker' => [ 'image' => 'boran/drupal',
+            'network' => 'BRIDGE',
+            'portmappings' => [ 'containerPort' =>80, 'hostPort'=>0 ]
+          ]
+        ]
+      );
+      $data = json_encode($data);
+      try {
+        $res = $this->client->post($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'body' => $data ]);
+        dpm( var_export($res->json(), true) );
+        return $res->json();
+      } catch (RequestException $e) {
+          #echo $e->getRequest();
+          if ($e->hasResponse()) {
+              dpm( $e->getResponse()->getStatusCode()
+                . ' ' . $e->getResponse()->getReasonPhrase() 
+                . ': ' . $e->getResponse()->json()['message']  );
+              #dpm( var_export( $e->getResponse(), true) );
+              #dpm(  $e->__toString() );
+              #dpm(  $e->getResponse()->getReasonPhrase() );
+              #dpm(  $e->getResponse()->json()['message'] );
+              #dpm(  $e->getResponse()->getBody() );
+              #dpm( var_export( $e->getResponse()->getBody(), true) );
+              #echo $e->getResponse();
+          }
+      }
+    }
+
+
+    /*
+     * get the app status and return a big text array (for the webfact inspect page)
+     */
+    public function getInspect() {
+      $result = 'mesos ';
+      if ($this->website==null) {
+        return 'n/a';
+      }
+      $url = $this->mserver . 'v2/apps/' . $this->marathon_name;
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        $result = var_export($res->json(), true);
+      }
+      return $result;
+    }
+
+    /*
+     * get a short status for the webfact 'advnaced' page
+     */
     public function getStatus() {
       $runstatus = 'mesos ';
 

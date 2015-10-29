@@ -1318,6 +1318,16 @@ END;
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
+      if ($this->container_api == 1) { // mesos XX
+      try {
+        $mesos = new Mesos($this->nid);
+        $mesos->deleteApp();
+      }
+      finally {
+      }
+        return;
+      }
+
         if (! $container) {
           $this->message("$this->id does not exist",  'error');
           return;
@@ -1375,6 +1385,20 @@ END;
       }
 
       else if ($this->action=='inspect') {
+// XX
+        if ($this->container_api == 1) {  // mesos
+          $this->markup = 'Mesos information:<br><pre>';
+          try {
+            $mesos = new Mesos($this->nid);
+            $this->markup .= $mesos->getInspect();
+          }
+          finally {
+            // todo: catch exceptions
+            $this->markup .= '</pre>';
+          }
+        }
+        return;
+
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
         }
@@ -1787,6 +1811,16 @@ END;
 
       /* batchAPI wrapper around "create" for progress bar */
       else if ($this->action=='createui') {
+      if ($this->container_api == 1) {
+      try {
+        $mesos = new Mesos($this->nid);
+        $mesos->createApp();
+      }
+      finally {
+      }
+        return;
+      }
+
         $batch = array(
           'title' => t('Creating ' . $this->id),
           'operations' => array(
@@ -1809,6 +1843,11 @@ END;
        }
 
       else if ($this->action=='create') {
+      if ($this->container_api == 1) {
+	$this->message('Meos: not yet..');
+        return;
+      }
+
         $this->extdb('create', $verbose);  // if an an external DB is needed
 
         // create the container

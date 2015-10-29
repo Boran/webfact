@@ -15,6 +15,8 @@ use Docker\Http\DockerClient;
 use Docker\Exception\ImageNotFoundException;
 #use Docker\Docker;
 
+require 'mesos.php';
+
 
 /*
  * encapsulate the Webfactory stuff into a calls, for easier Drupal7/8 porting
@@ -24,7 +26,7 @@ class WebfactController {
   protected $config, $user, $website, $des, $category;
   protected $verbose, $msglevel1, $msglevel2, $msglevel3;
   protected $cont_image, $cont_mem, $dserver, $fserver, $loglines, $env_server; // settings
-  protected $container_api, $mserver, $marathon_name; // marathon api
+  protected $container_api;
   protected $is_drupal; // is this a drupal container: enable drupal features
   protected $done_per;  // status value back from a drupal container when build is finished
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
@@ -54,7 +56,6 @@ class WebfactController {
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
     //$this->dserver   = variable_get('webfact_dserver', 'tcp://mydockerserver.example.ch:2375');
     $this->dserver   = variable_get('webfact_dserver', 'unix:///var/run/docker.sock');
-    $this->mserver   = variable_get('webfact_mserver', '');  // marathon api
     $this->fserver   = variable_get('webfact_fserver', 'webfact.example.ch');
     $this->rproxy    = variable_get('webfact_rproxy', 'nginx');
     $this->loglines  = variable_get('webfact_loglines', 300);
@@ -321,12 +322,6 @@ END;
     if (!empty($this->website->field_container_api['und'][0]['value']) ) {
       $this->container_api = $this->website->field_container_api['und'][0]['value'];
     }
-    if (!empty($this->website->field_marathon_name['und'][0]['safe_value']) ) {
-      $this->marathon_name = $this->website->field_marathon_name['und'][0]['safe_value'];
-    }
-    if (strlen($this->marathon_name) < 1) {
-      $this->marathon_name = $this->id; // fall back to the hostname
-    }
 
     if ($this->container_api == 0) {  // docker API
       // get container and status
@@ -356,30 +351,14 @@ END;
       }
 
     } else if ($this->container_api == 1) {
-      $runstatus='mesos';
-
-try {
-
-// XX
-$client = new GuzzleHttp\Client();
-$url = $this->mserver . 'v2/apps/' . $this->marathon_name;
-#dpm($url);
-$res = $client->get($url, [ 'auth' => ['user', 'pass'] ]);
-if ($res->getStatusCode()==200) {
-  #dpm($res->getHeader('content-type'));
-  #dpm($res->__toString());
-  #dpm($res->getBody());
-  #dpm($res->json()['app']['tasks'][0]['startedAt']);
-  #dpm($res->json());
-  #if ($response->getBody()) {
-    #dpm($res->json());
-  #}
-  $runstatus.=' ' . $res->json()['app']['tasks'][0]['startedAt'];
-}
-
-}
-finally {
-}
+      try {
+        $runstatus='mesos';
+        $mesos = new Mesos($this->nid);
+        $runstatus.=' ' . $mesos->getStatus();
+      }
+      finally {
+        // todo: catch exceptions
+      }
 
     } else {
       $runstatus='api-unknown';
@@ -670,12 +649,6 @@ finally {
     // Mesos
     if (!empty($this->website->field_container_api['und'][0]['value']) ) {
       $this->container_api = $this->website->field_container_api['und'][0]['value'];
-    }
-    if (!empty($this->website->field_marathon_name['und'][0]['safe_value']) ) {
-      $this->marathon_name = $this->website->field_marathon_name['und'][0]['safe_value'];
-    } 
-    if (strlen($this->marathon_name) < 1) {
-      $this->marathon_name = $this->id; // fall back to the hostname
     }
 
     // Initial docker environment variables
@@ -2301,9 +2274,6 @@ finally {
 
 
       case 'advanced':  // just drop through to menu below
-        if ($this->container_api == 1) {
-           dpm('Api=' . $this->container_api . ', marathon_name=' . $this->marathon_name .', mserver=' . $this->mserver); // XX
-        }
         // two ways of updating the status regularly
         // a) browser refresh every yy secs
           #$meta_refresh = array(    // refresh status every minute

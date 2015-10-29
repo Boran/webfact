@@ -993,33 +993,6 @@ END;
 
 // XX
     $runstatus=$this->getContainerDockerStatus();
-/*
-    // get container and status
-    $manager = $this->getContainerManager();
-    $container = $manager->find($this->id);
-    if ($container==null) {
-      $runstatus = 'unknown';
-      return $runstatus;
-    }
-    $manager->inspect($container);
-    $cont = array();
-    $cont = $container->getRuntimeInformations();
-    if (isset($cont['State'])) {
-      if ($cont['State']['Paused']==1) {
-        $runstatus = 'paused';
-      }
-      else if ($cont['State']['Running']==1) {
-        $runstatus = 'running';
-      }
-      else if ($cont['State']['Restarting']==1) {
-        $runstatus = 'restarting';
-      }
-      else {
-        //dpm($cont['State']);
-        $runstatus = 'stopped';
-      }
-    }
-*/
 
     // grab some more key run info
     #dpm($cont);

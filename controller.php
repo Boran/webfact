@@ -1082,6 +1082,13 @@ END;
       }
 
       else if ($this->action=='version') {
+// XX: todo not working yet, needs a container_api
+//dpm('version, node=' . $this->nid . ', api=' . $this->container_api);
+        if ($this->container_api == 1) {
+          $mesos = new Mesos($this->nid);
+          $this->markup = '<pre>' . var_export($mesos->getVersion()) .'</pre>';
+          break;
+        }
         $response = $this->client->get(["/version",[]]);
         $this->markup = '<pre>' . $response->getBody() .'</pre>';
       }
@@ -1543,6 +1550,10 @@ END;
       }
 
       else if ($this->action=='logs') {
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          return;
+        }
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
         }
@@ -1687,6 +1698,10 @@ END;
 
 
       else if ($this->action=='coappupdate') {
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          return;
+        }
         global $base_root;
         $this->touch_node_date();
         $this->client->setDefaultOption('timeout', 120);   // can take time
@@ -1982,6 +1997,10 @@ END;
       }
 
       else if ($this->action=='restart') {
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          return;
+        }
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
         }
@@ -2577,6 +2596,10 @@ END;
 
 
       case 'backup':  // commit a container to an image
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         global $base_root;
         $this->client->setDefaultOption('timeout', 80);
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
@@ -2600,6 +2623,10 @@ END;
 
 
       case 'cocmd':
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         $this->client->setDefaultOption('timeout', 60);
         $this->markup = '<div class="container-fluid">';
         $html = <<<END

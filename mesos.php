@@ -180,6 +180,16 @@ class Mesos
       return $result;
     }
 
+    public function getVersion() {
+      $result = $this->mserver;
+      $url = $this->mserver . 'v2/info';
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        $result = $res->json();
+      }
+      return $result;
+    }
+
     /*
      * get the app status and return a big text array (for the webfact inspect page)
      */

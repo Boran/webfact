@@ -350,28 +350,45 @@ END;
         }
       }
 
+// XX
     } else if ($this->container_api == 1) {
       try {
         $runstatus='mesos';
         $mesos = new Mesos($this->nid);
-        $runstatus.=' ' . $mesos->getStatus();
-    } catch (Exception $e) {
-      if ($e->getResponse()->getStatusCode() == 404) {
-        $runstatus='mesos-no container';
+        $runstatus .= ' ' . $mesos->getStatus();
+
+      } catch (RequestException $e) {
+        # never called
+        #dpm( $e->getResponse()->json()['message']  );
+
+      } catch (Exception $e) {
+        $runstatus='messos-error';
+        // todo: this code is never reached??
+#dpm($e->getMessage());
+        #  $this->message('Mesos:' . $e->getResponse()->getReasonPhrase() .
+        #    " (error code " . $e->getResponse()->getStatusCode(). " )" , 'warning');
+        #else {
+        #  $this->message($e->getMessage(), 'error');
+        #}
+
+        #echo $e->getRequest();
+        if ($e->hasResponse()) {
+          if ($e->getResponse()->getStatusCode()==404) {
+            $runstatus='mesos-no container';
+          } else {
+            dpm( ' :: ' . $e->getResponse()->getStatusCode()
+              . ', ' . $e->getResponse()->getReasonPhrase()
+              . ': ' . $e->getResponse()->json()['message']  );
+            #dpm( var_export( $e->getResponse(), true) );
+            dpm(  $e->__toString() );
+          }
+          #throw($e);    // abort  downstream
+        }
       }
-      else if ($e->hasResponse()) {
-        $this->message('Mesos:' . $e->getResponse()->getReasonPhrase() .
-          " (error code " . $e->getResponse()->getStatusCode(). " )" , 'warning');
-      }
-      else {
-        $this->message($e->getMessage(), 'error');
-      }
-    }
 
     } else {
       $runstatus='api-unknown';
     }
-
     return $runstatus;
   }
 
@@ -1326,14 +1343,6 @@ END;
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
-// XX
-        if ($this->container_api == 1) { // mesos 
-          $this->message("Mesos: deleting ..");
-          $mesos = new Mesos($this->nid);
-          $result = $mesos->deleteApp();  //deploymentId version
-          dpm( var_export($result[0], true) );
-          return;
-        }
 
         if (! $container) {
           $this->message("$this->id does not exist",  'error');
@@ -1350,6 +1359,21 @@ END;
 
         watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
         $this->touch_node_date();
+// XX
+        if ($this->container_api == 1) { // mesos 
+          #$this->message("Mesos: deleting ..");
+          $mesos = new Mesos($this->nid);
+          $result = $mesos->deleteApp();  //deploymentId version
+          if ($this->verbose===1) {
+            $this->message("$this->action $this->id");
+            if (isset($result[0])) {
+              $this->message( var_export($result[0], true) );
+            }
+            drupal_goto("/website/advanced/$this->nid"); // show new status
+          }
+          return;
+        }
+
         if ($this->action=='deleteui') {  // use batch
           $batch = array(
             'title' => t('Remove ' . $this->id),
@@ -1369,7 +1393,6 @@ END;
             drupal_goto("/website/advanced/$this->nid"); // show new status
           }
         }
-
         return;
       }
 
@@ -1544,6 +1567,20 @@ END;
       }
 
       else if ($this->action=='start') {
+// XX
+        if ($this->container_api == 1) { // mesos 
+          $mesos = new Mesos($this->nid);
+          $result = $mesos->startApp(); 
+          if ($this->verbose===1) {
+            $this->message("mesos $this->action $this->id");
+            if (isset($result['version'])) {
+              $this->message($result['version'] . ' Deployment ID=' . $result['deploymentId']);
+            }
+            drupal_goto("/website/advanced/$this->nid"); // show new status
+          }
+          return;
+        }
+
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
         }
@@ -1818,15 +1855,15 @@ END;
 
       /* batchAPI wrapper around "create" for progress bar */
       else if ($this->action=='createui') {
+
 // XX
       if ($this->container_api == 1) {
       //try {
 	$this->message('Meos: creating ..' );
         $mesos = new Mesos($this->nid);
         $result = $mesos->createApp();
-        $this->message('created, answer:');
-        dpm('Deployment id=' . $result['deployments'][0]['id'] );
-        dpm( var_export($result['container']['docker'], true) );
+        $this->message('created, Deployment id=' . $result['deployments'][0]['id'] );
+        #dpm( var_export($result['container']['docker'], true) );
         #dpm( var_export($result, true) );
       /*} catch (Exception $e) {
         if ($e->hasResponse()) {
@@ -1838,10 +1875,18 @@ END;
           $this->message($e->getMessage(), 'error');
         }
       }*/
-        
-      }
-      else {
 
+        $this->touch_node_date();
+        if ($verbose == 1) {
+          $this->message($msg, 'status', 2);
+          $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
+          $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
+          $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
+          drupal_goto("/website/advanced/$this->nid"); // show new status
+        }
+      }
+
+      else {
         $batch = array(
           'title' => t('Creating ' . $this->id),
           'operations' => array(
@@ -1949,6 +1994,20 @@ END;
       }
 
       else if ($this->action=='stop') {
+// XX
+        if ($this->container_api == 1) { // mesos 
+          $mesos = new Mesos($this->nid);
+          $result = $mesos->stopApp();  //deploymentId version
+          if ($this->verbose===1) {
+            $this->message("$this->action $this->id");
+            if (isset($result[0])) {
+              $this->message( var_export($result[0], true) );
+            }
+            drupal_goto("/website/advanced/$this->nid"); // show new status
+          }
+          return;
+        }
+
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
         }

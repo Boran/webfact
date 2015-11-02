@@ -355,10 +355,18 @@ END;
         $runstatus='mesos';
         $mesos = new Mesos($this->nid);
         $runstatus.=' ' . $mesos->getStatus();
+    } catch (Exception $e) {
+      if ($e->getResponse()->getStatusCode() == 404) {
+        $runstatus='mesos-no container';
       }
-      finally {
-        // todo: catch exceptions
+      else if ($e->hasResponse()) {
+        $this->message('Mesos:' . $e->getResponse()->getReasonPhrase() .
+          " (error code " . $e->getResponse()->getStatusCode(). " )" , 'warning');
       }
+      else {
+        $this->message($e->getMessage(), 'error');
+      }
+    }
 
     } else {
       $runstatus='api-unknown';
@@ -1318,15 +1326,14 @@ END;
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
-      if ($this->container_api == 1) { // mesos XX
-      try {
-        $mesos = new Mesos($this->nid);
-        $mesos->deleteApp();
-      }
-      finally {
-      }
-        return;
-      }
+// XX
+        if ($this->container_api == 1) { // mesos 
+          $this->message("Mesos: deleting ..");
+          $mesos = new Mesos($this->nid);
+          $result = $mesos->deleteApp();  //deploymentId version
+          dpm( var_export($result[0], true) );
+          return;
+        }
 
         if (! $container) {
           $this->message("$this->id does not exist",  'error');
@@ -1811,15 +1818,29 @@ END;
 
       /* batchAPI wrapper around "create" for progress bar */
       else if ($this->action=='createui') {
+// XX
       if ($this->container_api == 1) {
-      try {
+      //try {
+	$this->message('Meos: creating ..' );
         $mesos = new Mesos($this->nid);
-        $mesos->createApp();
+        $result = $mesos->createApp();
+        $this->message('created, answer:');
+        dpm('Deployment id=' . $result['deployments'][0]['id'] );
+        dpm( var_export($result['container']['docker'], true) );
+        #dpm( var_export($result, true) );
+      /*} catch (Exception $e) {
+        if ($e->hasResponse()) {
+          $this->message('FOO:' . $e->getResponse()->getReasonPhrase() .
+            " (error code " . $e->getResponse()->getStatusCode(). " for action=$action in arguments())" , 'warning');
+          $this->message("Response details: " . $e->getResponse()->__toString(), 'warning', 3);
+        }
+        else {
+          $this->message($e->getMessage(), 'error');
+        }
+      }*/
+        
       }
-      finally {
-      }
-        return;
-      }
+      else {
 
         $batch = array(
           'title' => t('Creating ' . $this->id),
@@ -1841,6 +1862,7 @@ END;
         batch_process('website/advanced/' . $this->website->nid); // go here when done
         $this->touch_node_date();
        }
+      }
 
       else if ($this->action=='create') {
       if ($this->container_api == 1) {
@@ -2794,8 +2816,8 @@ END;
     } catch (Exception $e) {
       if ($e->hasResponse()) {
         $this->message($e->getResponse()->getReasonPhrase() .
-          " (error code " . $e->getResponse()->getStatusCode(). " for action=$action in arguments())" , 'warning');
-        $this->message("Response details: " . $e->getResponse()->__toString(), 'warning', 3);
+          " (error code " . $e->getResponse()->getStatusCode(). " for action=$action in controller::arguments())" , 'warning');
+        $this->message("Debug response details: " . $e->getResponse()->__toString(), 'warning', 3);
       }
       else {
         $this->message($e->getMessage(), 'error');

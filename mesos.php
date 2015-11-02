@@ -11,9 +11,7 @@ class Mesos
 
     public function __construct($nid)
     {
-      $this->client = new GuzzleHttp\Client();
       $this->mserver = variable_get('webfact_mserver', '');  // marathon api
-      // exception if empty
 
       // get the node and find the container name
       // todo: check nid must be >0?
@@ -35,57 +33,81 @@ class Mesos
         $this->marathon_name = $this->id; // fall back to the hostname
       }
       # else throw exception
+
+      $this->client = new GuzzleHttp\Client();
+      // todo: create the initial request object
+      // exception if empty
     }
 
 
     public function deleteApp() {
-      $url = $this->mserver . 'v2/apps/' . $this->marathon_name;
+      $url = $this->mserver . 'v2/apps/' . $this->id;
       try {
+        #dpm('mesos deleteApp ' . $this->id);
         $res = $this->client->delete($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '']);
-        dpm( var_export($res->json(), true) );
+        #dpm( var_export($res->json(), true) );
         return $res->json();
       } catch (RequestException $e) {
           #echo $e->getRequest();
           if ($e->hasResponse()) {
-              dpm( $e->getResponse()->getStatusCode()
+            if ($e->getResponse()->getStatusCode()==404) {
+              dpm( $e->getResponse()->json()['message']  );
+            } else {
+              dpm( 'deleteApp ' . $e->getResponse()->getStatusCode()
                 . ' ' . $e->getResponse()->getReasonPhrase() 
                 . ': ' . $e->getResponse()->json()['message']  );
+            } 
           } 
+          throw($e);    // abort  downstream
       } 
     }
 
     public function createApp() {
       $url = $this->mserver . 'v2/apps';
       $data = array(
-        'id' => '/drupal1',
+        'id' => $this->id,
         'cmd' => '/start.sh',
         'cpus' => 0.5,
         'mem' => 256.0,
-        'container' => [ 'type' => 'DOCKER',
-          'docker' => [ 'image' => 'boran/drupal',
+        'container' => [ 
+          'type' => 'DOCKER',
+          'docker' => [ 
+            'image' => 'boran/drupal',
             'network' => 'BRIDGE',
-            'portmappings' => [ 'containerPort' =>80, 'hostPort'=>0 ]
+            'XportMappings' => [ 
+              'containerPort' =>80, 
+              'hostPort'=>0 , 
+              'servicePort'=>10005 , 
+              'protocol'=>'tcp'
+            ]
           ]
         ]
       );
+      dpm($data['container']['docker']);
       $data = json_encode($data);
       try {
-        $res = $this->client->post($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'body' => $data ]);
-        dpm( var_export($res->json(), true) );
+        $res = $this->client->post($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'headers' => ['Content-Type' => 'application/json'], 'body' => $data ]);
+        #dpm('Mesos create, answer:');
+        #dpm( var_export($res->json(), true) );
         return $res->json();
       } catch (RequestException $e) {
           #echo $e->getRequest();
           if ($e->hasResponse()) {
+            if ($e->getResponse()->getStatusCode()==409) {
+              dpm( $e->getResponse()->json()['message']  );
+            } else {
               dpm( $e->getResponse()->getStatusCode()
-                . ' ' . $e->getResponse()->getReasonPhrase() 
+                . ', ' . $e->getResponse()->getReasonPhrase() 
                 . ': ' . $e->getResponse()->json()['message']  );
               #dpm( var_export( $e->getResponse(), true) );
-              #dpm(  $e->__toString() );
+              dpm(  $e->__toString() );
               #dpm(  $e->getResponse()->getReasonPhrase() );
               #dpm(  $e->getResponse()->json()['message'] );
               #dpm(  $e->getResponse()->getBody() );
               #dpm( var_export( $e->getResponse()->getBody(), true) );
               #echo $e->getResponse();
+            }
+            throw($e);    // abort  downstream
           }
       }
     }
@@ -138,7 +160,12 @@ class Mesos
         #if ($response->getBody()) {
           #dpm($res->json());
         #}
-        $runstatus = $res->json()['app']['tasks'][0]['startedAt'];
+        if (isset($res->json()['app']['tasks'][0]['startedAt'])) {
+         $runstatus = $res->json()['app']['tasks'][0]['startedAt'];
+        }
+        else  {
+          $runstatus = ' n/a';
+        }
       }
       else if ($res->getStatusCode()==404) {
         $runstatus = 'mesos: not found';

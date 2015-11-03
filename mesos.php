@@ -97,6 +97,31 @@ class Mesos
       }
     }
 
+
+    public function restartApp($verbose=0) {
+      $url = $this->mserver . 'v2/apps/' . $this->marathon_name . '/restart';
+      try {
+        #dpm('mesos restartApp ' . $this->marathon_name);
+        $res = $this->client->post($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '']);
+        #dpm( var_export($res->json(), true) );
+        return $res->json();
+      } catch (RequestException $e) {
+        if ($verbose > 0) {
+          #echo $e->getRequest();
+          if ($e->hasResponse()) {
+            if ($e->getResponse()->getStatusCode()==404) {
+              drupal_set_message( 'mesos: ' . $e->getResponse()->json()['message']  );
+            } else {
+              drupal_set_message( 'restartApp ' . $e->getResponse()->getStatusCode()
+                . ' ' . $e->getResponse()->getReasonPhrase()
+                . ': ' . $e->getResponse()->json()['message']  );
+            }
+          }
+        }
+        throw($e);    // abort  downstream
+      }
+    }
+
     public function deleteApp($verbose=0) {
       $url = $this->mserver . 'v2/apps/' . $this->marathon_name;
       try {

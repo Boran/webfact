@@ -2086,10 +2086,20 @@ END;
 
 
       else if ($this->action=='restart') {
-        if ($this->container_api == 1) {
-          $this->message("Mesos $this->action not available ", 'warning');
+        if ($this->container_api == 1) { // mesos 
+          // todo: this is really a rebuild not a restart!
+          $mesos = new Mesos($this->nid);
+          $result = $mesos->restartApp();
+          if ($this->verbose===1) {
+            #$this->message("$this->action $this->id");
+            if (isset($result['version'])) {
+              $this->message("mesos: restart $this->id, version=" . $result['version'] . ", deployment id=" . $result['deploymentId'] );
+            }
+          }
+          drupal_goto("/website/advanced/$this->nid"); // show new status
           return;
-        }
+        } 
+
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
         }

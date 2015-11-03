@@ -1,5 +1,5 @@
 <?php
-
+ 
 /**
  * @file
  * Contains \Drupal\webfact\Controller\WebfactController
@@ -393,23 +393,45 @@ END;
   }
 
   /*
-   * delete a container by name and its external DB 
-   * no checking of permissions,
+   * delete a container: mesos by nid, docker by name	
+   * todo: return code for docker?
+   *       verbose argument?
+   *       docker: if no name, use nid
+   *       mesos: if no nid, use name
    */
-  public function deleteContainer($nid, $name) {
-     $manager = $this->getContainerManager();
-     $container = $manager->find($name);
-     if (!$container) {
-       watchdog('webfact', "deleteContainer $name - no such container");
-       return;
-     }
-     if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
-       $manager->stop($container);
-     }
-     # keep DB..  $this->deleteContainerDB($nid, $name); 
-     $manager->remove($container);
-     watchdog('webfact', "deleteContainer $name - removed" . ' by ' . $this->user);
+  public function deleteContainer($nid, $name, $verbose=0) {
+    $result='';
+    if ($this->container_api == 1) { // mesos 
+      #$this->message("Mesos: deleting ..");
+      $mesos = new Mesos($this->nid);
+      $result = $mesos->deleteApp($verbose);  //deploymentId version
+      if ($verbose > 1) {  // UI message
+        if (isset($result[0])) {
+          $this->message( var_export($result[0], true) );
+          watchdog('webfact', var_export($result[0], true) );
+        }
+      }
+
+    } else { // docker api
+      $manager = $this->getContainerManager();
+      $container = $manager->find($name);
+      if (!$container) {
+        watchdog('webfact', "deleteContainer $name - no such container");
+        return;
+      }
+      if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+        $manager->stop($container);
+      }
+      # keep DB..  $this->deleteContainerDB($nid, $name); 
+      $manager->remove($container);
+    }
+    watchdog('webfact', "deleteContainer $name - removed" . ' by ' . $this->user);
+    if ($verbose > 1) {  // UI message
+      $this->message("$this->action $this->id");
+    }
+    return $result;
   }
+
 
   public function deleteContainerDB($nid, $name) {
      watchdog('webfact', "deleteContainerDB $name" . ' by ' . $this->user);
@@ -615,40 +637,74 @@ END;
    * create a container: test function, really abstract this bit out?
    * implementation does not smell good!
    */
-  public function create($verbose = 0) {   // create a container
+  public function createContainer($verbose = 0) {   // create a container
+     $result='';
      // todo: make sure $id and all "this" stuff is loaded
-     $manager = $this->getContainerManager();
 
      $this->extdb('create', $verbose);  // if an an external DB is needed
 
-     // create the container
-        $config = ['Image'=> $this->cont_image, 
-                   # dont use anymore: 'Hostname' => $this->fqdn,
-                   'Env'  => $this->docker_env, 
-                   'Volumes'  => $this->docker_vol
+     if ($this->container_api == 1) { // mesos 
+        $this->message('Meos: creating ..' );
+        $mesos = new Mesos($this->nid);
+        $result = $mesos->createApp();
+        if ($this->verbose===1) {
+          if ($verbose == 1) {
+            if (isset($result['version'])) {
+              watchdog('webfact', "mesos: created $this->id, " . $result['version'] . " Deployment id=" . $result['deployments'][0]['id'] );
+            }
+          }
+        }
+
+      } else {  // docker API
+
+        // create the container
+        $config = ['Image'    => $this->cont_image,
+                   # Dont use any more: 'Hostname' => $this->fqdn,
+                   'Env'      => $this->docker_env,
+                   //'Volumes'  => [ '/data' => array() ],
+                   'Volumes'  => $this->docker_vol,
         ];
+        #dpm('--create: config--');
         #dpm($config);
+        $manager = $this->getContainerManager();
         $container= new Docker\Container($config);
         $container->setName($this->id);
+        if ($verbose == 1) {
+          $this->message("docker create $this->id from $this->cont_image", 'status', 3);
+        }
         $manager->create($container);
-
-     // start
+        if ($verbose == 1) {
+          $this->message("start ", 'status', 3);
+        }
+        #dpm('--create2--');
+        if ($this->cont_mem > 0) {
+          $this->startconfig['Memory'] = $this->cont_mem;
+          watchdog('webfact', 'container->setMemory ' . $this->cont_mem);
+        }
         #dpm($this->startconfig);
         $manager->start($container, $this->startconfig);
+      }
 
+      // both APIS
         $msg= "$this->action $this->id: title=" . $this->website->title
-          . ", docker image=$this->cont_image"  . ' by ' . $this->user;
+          . ", docker image=$this->cont_image" . ' by ' . $this->user;
         watchdog('webfact', $msg);
+        $this->touch_node_date();
 
         if ($verbose == 1) {
           $this->message($msg, 'status', 2);
           // inform user:
           $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
           $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
-          $this->message("Provisioning: you can connect to the new site at $newtime.", 'status');
-          drupal_goto("/website/advanced/$this->nid"); // show new status
+          $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
+
+          // TODO: do some ajax to query the build status and confirm when done
+          #$this->message("Build=" .$this->getContainerBuildStatus());
+          #if ($this->getContainerBuildStatus() == 100) {
+          #  $this->message("Build finished");
+          #}
         }
-        return;
+     return $result;
   }
 
 
@@ -1344,6 +1400,8 @@ END;
         $this->markup = "<h3>Results</h3> <pre>$logs</pre>";   // show output
       }
 
+
+      // delete container
       else if (($this->action=='delete') || ($this->action=='deleteui') ) {
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
@@ -1351,22 +1409,25 @@ END;
           return;
         }
 
-        if (! $container) {
-          $this->message("$this->id does not exist",  'error');
-          return;
-        }
-        else if ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
-          if ($this->verbose===1) {
-            $this->message("$this->id must be stopped first", 'warning');
+        if ($this->container_api == 1) { // mesos 
+          // todo: check $this->id
+
+        } else {   // docker api
+          if (! $container) {
+            $this->message("$this->id does not exist",  'error');
             return;
-          } else {
-            $manager->stop($container);
+          }
+          else if ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+            if ($this->verbose===1) {
+              $this->message("$this->id must be stopped first", 'warning');
+              return;
+            } else {
+              $manager->stop($container);
+            }
           }
         }
-
-        watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
-        $this->touch_node_date();
 // XX
+/*
         if ($this->container_api == 1) { // mesos 
           #$this->message("Mesos: deleting ..");
           $mesos = new Mesos($this->nid);
@@ -1380,9 +1441,11 @@ END;
           }
           return;
         }
+*/
 
         if ($this->action=='deleteui') {  // use batch
-          $batch = array(
+          /* 2015.11.03: no longer use batch interface
+           $batch = array(
             'title' => t('Remove ' . $this->id),
             'operations' => array(
               array('batchRemoveCont', array($this->website->nid, $this->id, 1)),
@@ -1392,14 +1455,19 @@ END;
           );
           batch_set($batch);
           batch_process('website/advanced/' . $this->website->nid); // go here when done
+          */
+          $this->deleteContainer($this->nid, $this->id, 2);
+          drupal_goto("/website/advanced/$this->nid"); // show new status
 
-        } else if ($this->action=='delete') {  
-          $manager->remove($container);
+        } else if ($this->action=='delete') {     // todo: still used?
+          #$manager->remove($container); should call deleteContainer()?
+          $this->deleteContainer($this->nid, $this->id);
           if ($this->verbose===1) {
-            $this->message("$this->action $this->id");
             drupal_goto("/website/advanced/$this->nid"); // show new status
           }
         }
+        watchdog('webfact', "$this->action $this->id ", array(), WATCHDOG_NOTICE);
+        $this->touch_node_date();
         return;
       }
 
@@ -1433,8 +1501,8 @@ END;
             // todo: catch exceptions
             $this->markup .= '</pre>';
           }
+          return;
         }
-        return;
 
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
@@ -1872,7 +1940,7 @@ END;
       else if ($this->action=='createui') {
 
 // XX
-      if ($this->container_api == 1) {
+/*      if ($this->container_api == 1) {
       //try {
 	$this->message('Meos: creating ..' );
         $mesos = new Mesos($this->nid);
@@ -1880,16 +1948,6 @@ END;
         $this->message('created, Deployment id=' . $result['deployments'][0]['id'] );
         #dpm( var_export($result['container']['docker'], true) );
         #dpm( var_export($result, true) );
-      /*} catch (Exception $e) {
-        if ($e->hasResponse()) {
-          $this->message('FOO:' . $e->getResponse()->getReasonPhrase() .
-            " (error code " . $e->getResponse()->getStatusCode(). " for action=$action in arguments())" , 'warning');
-          $this->message("Response details: " . $e->getResponse()->__toString(), 'warning', 3);
-        }
-        else {
-          $this->message($e->getMessage(), 'error');
-        }
-      }*/
 
         $this->touch_node_date();
         if ($verbose == 1) {
@@ -1899,9 +1957,8 @@ END;
           $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
           drupal_goto("/website/advanced/$this->nid"); // show new status
         }
-      }
-
-      else {
+      } else {
+*/
         $batch = array(
           'title' => t('Creating ' . $this->id),
           'operations' => array(
@@ -1922,15 +1979,35 @@ END;
         batch_process('website/advanced/' . $this->website->nid); // go here when done
         $this->touch_node_date();
        }
-      }
+ //     }
+
+
 
       else if ($this->action=='create') {
-      if ($this->container_api == 1) {
-	$this->message('Meos: not yet..');
-        return;
+        $this->createContainer($verbose);
+/*
+        $this->extdb('create', $verbose);  // if an an external DB is needed
+
+      if ($this->container_api == 1) {  // mesos API
+      //try {
+        $this->message('Meos: creating ..' );
+        $mesos = new Mesos($this->nid);
+        $result = $mesos->createApp();
+        $this->message('created, Deployment id=' . $result['deployments'][0]['id'] );
+        #dpm( var_export($result['container']['docker'], true) );
+        #dpm( var_export($result, true) );
+      } catch (Exception $e) {
+        if ($e->hasResponse()) {
+          $this->message('FOO:' . $e->getResponse()->getReasonPhrase() .
+            " (error code " . $e->getResponse()->getStatusCode(). " for action=$action in arguments())" , 'warning');
+          $this->message("Response details: " . $e->getResponse()->__toString(), 'warning', 3);
+        }
+        else {
+          $this->message($e->getMessage(), 'error');
+        }
       }
 
-        $this->extdb('create', $verbose);  // if an an external DB is needed
+      } else {  // docker API
 
         // create the container
         $config = ['Image'    => $this->cont_image, 
@@ -1957,7 +2034,9 @@ END;
         }
         #dpm($this->startconfig);
         $manager->start($container, $this->startconfig);
+      }
 
+      // both APIS
         $msg= "$this->action $this->id: title=" . $this->website->title
           . ", docker image=$this->cont_image" . ' by ' . $this->user;
         watchdog('webfact', $msg);
@@ -1978,10 +2057,19 @@ END;
           drupal_goto("/website/advanced/$this->nid"); // show new status
           #drupal_goto("/website/logs/$this->nid"); // show new status
         }
+*/
+        if ($verbose == 1) {
+          drupal_goto("/website/advanced/$this->nid"); // show new status
+        }
         return;
       }
 
+
       else if ($this->action=='kill') {
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          return;
+        }
         if (! $container) {
           $this->message("$this->id does not exist", 'warning');
         }
@@ -1995,6 +2083,7 @@ END;
         }
         return;
       }
+
 
       else if ($this->action=='restart') {
         if ($this->container_api == 1) {

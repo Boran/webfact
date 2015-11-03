@@ -84,20 +84,20 @@ class Mesos
         #echo $e->getRequest();
         if ($e->hasResponse()) {
           if ($e->getResponse()->getStatusCode()==409) { // conflict
-            dpm( $e->getResponse()->json()['message']  );
+            drupal_set_message( $e->getResponse()->json()['message']  );
           } else {
-            dpm( 'startApp ' . $e->getResponse()->getStatusCode()
+            drupal_set_message( 'startApp ' . $e->getResponse()->getStatusCode()
               . ', ' . $e->getResponse()->getReasonPhrase()
               . ': ' . $e->getResponse()->json()['message']  );
             #dpm( var_export( $e->getResponse(), true) );
-            dpm(  $e->__toString() );
+            drupal_set_message(  $e->__toString() );
           }
           throw($e);    // abort  downstream
         }
       }
     }
 
-    public function deleteApp() {
+    public function deleteApp($verbose=0) {
       $url = $this->mserver . 'v2/apps/' . $this->marathon_name;
       try {
         #dpm('mesos deleteApp ' . $this->marathon_name);
@@ -105,17 +105,19 @@ class Mesos
         #dpm( var_export($res->json(), true) );
         return $res->json();
       } catch (RequestException $e) {
+        if ($verbose > 0) {
           #echo $e->getRequest();
           if ($e->hasResponse()) {
             if ($e->getResponse()->getStatusCode()==404) {
-              dpm( 'mesos: ' . $e->getResponse()->json()['message']  );
+              drupal_set_message( 'mesos: ' . $e->getResponse()->json()['message']  );
             } else {
-              dpm( 'deleteApp ' . $e->getResponse()->getStatusCode()
+              drupal_set_message( 'deleteApp ' . $e->getResponse()->getStatusCode()
                 . ' ' . $e->getResponse()->getReasonPhrase() 
                 . ': ' . $e->getResponse()->json()['message']  );
             } 
           } 
-          throw($e);    // abort  downstream
+        } 
+        throw($e);    // abort  downstream
       } 
     }
 

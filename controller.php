@@ -654,11 +654,16 @@ END;
       }
       $cont['image']=$this->cont_image;
       $cont['cmd']='/start.sh';
-      $cont['port']=80;
-      $cont['env']=$this->docker_env;
+      $cont['port']=443;   // todo: parameter
       $cont['vol']=$this->docker_vol;
       $cont['ports']=$this->docker_ports;
       $cont['url']=$this->fqdn;
+      // Reformat $this->docker_env from key=value to key=>value for mesos
+      foreach ($this->docker_env as $row) {
+        if ( preg_match("/\s*(.+)=(.+)\s*/", $row, $matches) ) {
+          $cont['env'][$matches[1]] = $matches[2];
+        }
+      }
       $mesos = new Mesos($this->nid);
       $result = $mesos->createApp($cont, 1);
       if ($this->verbose===1) {

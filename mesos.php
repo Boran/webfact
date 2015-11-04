@@ -238,12 +238,12 @@ class Mesos
               'containerPort' =>$cont['port'],  
               'hostPort'=>0, 
             ]]
-          ]
-        ]
+          ],
+        ],
+        'env' => $cont['env'],
       );
-      #dpm($data['container']['docker']);
       $data = json_encode($data);
-// XXdpm($cont);
+
       try {
         #dpm($url); dpm( var_export($data, true) );
         $res = $this->client->post($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'headers' => ['Content-Type' => 'application/json'], 'body' => $data ]);

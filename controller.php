@@ -1475,6 +1475,21 @@ END;
         return;
       }
 
+      else if ($this->action=='mesos') {
+        $this->markup = "<pre>Mesos server :\n\n" ;
+        $this->markup .= "----- Apps\t\t\n";
+        $mesos = new Mesos($this->nid);
+        $this->markup .= var_export($mesos->getApps(), true);
+        $this->markup .= "\n\n----- Tasks\n";
+        $this->markup .= var_export($mesos->getTasks(), true);
+        $this->markup .= "\n\n----- Groups\n";
+        $this->markup .= var_export($mesos->getGroups(), true);
+        $this->markup .= "\n\n----- Deployments\n";
+        $this->markup .= var_export($mesos->getDeployments(), true);
+        $this->markup .= "</pre>" ;
+        return;
+      }
+
       else if ($this->action=='containers') {
         $this->markup = "<pre>Running containers:\n" ;
         $this->markup .= "Name\t\tImage\t\t\t Running?\t StartedAt\n";
@@ -2252,6 +2267,7 @@ END;
 
       // container operations must have a node and container
       switch ($action) {
+        case 'mesos':
         case 'advanced':
         case 'wait':
         case 'changes':
@@ -2426,6 +2442,7 @@ END;
       case 'logs':
       case 'deleteall':
       case 'processes':
+      case 'mesos':
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
           break;

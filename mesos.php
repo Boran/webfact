@@ -58,7 +58,7 @@ class Mesos
       $this->url_postfix='.mesos-dev.vptt.ch';
     }
 
-
+    /******** bambo ******/
     /* 
      * delete bamboo config: i.e. haproxy for mapping urls to app
      */
@@ -123,6 +123,7 @@ class Mesos
     }
 
 
+    /******** marathon ******/
     public function stopApp() {
       $url = $this->mserver . 'v2/apps/' . $this->marathon_name;
       try {
@@ -283,6 +284,45 @@ class Mesos
       }
     }
 
+    public function getApps() {
+      $result = $this->mserver;
+      $url = $this->mserver . 'v2/apps';
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        $result = $res->json();
+      }
+      return $result;
+    }
+
+    public function getTasks() {
+      $result = $this->mserver;
+      $url = $this->mserver . 'v2/tasks';
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        $result = $res->json();
+      }
+      return $result;
+    }
+
+    public function getGroups() {
+      $result = $this->mserver;
+      $url = $this->mserver . 'v2/groups';
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        $result = $res->json();
+      }
+      return $result;
+    }
+
+    public function getDeployments() {
+      $result = $this->mserver;
+      $url = $this->mserver . 'v2/deployments';
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        $result = $res->json();
+      }
+      return $result;
+    }
 
     public function getLeader() {
       $result = $this->mserver;

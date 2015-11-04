@@ -1375,6 +1375,13 @@ END;
         #}
         watchdog('webfact', 'deleteall ' . $this->id . 
           ', node id=' . $this->nid . ' by ' . $this->user);
+        // without the batch API:
+        $this->deleteContainer($this->nid, $this->id, 2);
+        $this->deleteContainerDB($this->nid, $this->id);
+        $this->deleteContainerData($this->nid, $this->id);
+        node_delete($this->nid); 
+        // batchDeleteContImages: create function
+/*
         $batch = array(
           'title' => t('Remove meta data & container ' . $this->id),
           'operations' => array(
@@ -1388,6 +1395,7 @@ END;
         );
         batch_set($batch);
         batch_process('websites'); // go here when done
+*/
         return;
       }
 

@@ -3,16 +3,22 @@
 use GuzzleHttp\Client as HttpClient;
 use GuzzleHttp\Exception\RequestException;
 
+/**
+ * Abstract Marathon and Bamboo API for management
+ * of containers with Mesos
+ */
+
 class Mesos
 {
-    private $client, $mserver;
+    private $client, $mserver, $bserver;
     private $id;   // webfact id for website
     private $website, $marathon_name;
-
+    private $url_postfix;   // Domain part of URL for reverse proxy
 
     public function __construct($nid)
     {
       $this->mserver = variable_get('webfact_mserver', '');  // marathon api
+      $this->bserver = variable_get('webfact_bserver', '');  // bamboo api
       $this->client = new GuzzleHttp\Client();
       // todo: create the initial request object with URL/proxy etc.
       // exception if empty
@@ -26,14 +32,15 @@ class Mesos
       #watchdog('webfact', 'mesos: leader is ' . $this->mserver);
       
       // get the webfact meta data for the website, specifically the container name
+      // load website node if needed
       if ($this->website==null) {
-        // get the node and find the container name
-        // todo: check nid must be >0?
         $this->website=node_load($nid);
-        //return;   // not on a valid node, throw exception?
+        #if ($this->website->nid == 0 ) {
+        #  return;   // not on a valid node, throw exception?
+        #}
       }
       if (empty($this->website->field_hostname['und'][0]['safe_value']) ) {
-        return;
+        return;  // throw exception?
       }
       $this->id = $this->website->field_hostname['und'][0]['safe_value'];
 
@@ -46,6 +53,73 @@ class Mesos
       # else throw exception
 
       #watchdog('webfact', 'mesos: connect to ' . $this->mserver . ' for ' . $this->marathon_name);
+
+      // todo: drupal setting, or per template or webiste?
+      $this->url_postfix='mesos-dev.vptt.ch';
+    }
+
+
+    /* 
+     * delete bamboo config: i.e. haproxy for mapping urls to app
+     */
+    public function deleteBamboo($verbose=0) {
+      $url = $this->bserver . 'api/services/' . $this->marathon_name;
+      try {
+        watchdog('webfact', 'deleteBamboo ' . $this->marathon_name);
+        $res = $this->client->delete($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '']);
+        #if ($verbose > 0) {
+          #dpm( var_export($res->json(), true) );
+        #}
+        return $res->json();
+      } catch (RequestException $e) {
+        if ($verbose > 0) {
+          if ($e->hasResponse()) {
+            if ($e->getResponse()->getStatusCode()==404) { // or 409?
+              drupal_set_message( 'mesos: ' . $e->getResponse()->json()['message']  );
+            } else {
+              drupal_set_message( 'deleteBamboo ' . $e->getResponse()->getStatusCode()
+                . ' ' . $e->getResponse()->getReasonPhrase()
+                . ': ' . $e->getResponse()->json()['message']  );
+            }
+          }
+        }
+        throw($e);    // abort  downstream
+      }
+    }
+
+    /* 
+     * update bamboo config: i.e. haproxy for mapping urls to app
+     * curl -i -X PUT -d '{"id":"/ExampleAppGroup/app1", "acl":"path_beg -i /group/app-1"}' http://localhost:8000/api/services//ExampleAppGroup/app1
+     */
+    public function updateBamboo($verbose=0) {
+      $url = $this->bserver . 'api/services/' . $this->marathon_name;
+      try {
+        $data = json_encode(array('id'=>$this->marathon_name, 'acl' =>'hdr(host) -i ' . $this->id . $this->url_postfix));
+        watchdog('webfact', 'updateBamboo ' . $this->marathon_name . ' hdr(host) -i ' . $this->id . $this->url_postfix);
+        $res = $this->client->put($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'headers' => ['Content-Type' => 'application/json'], 'body' => $data ]);
+        if ($verbose > 0) {
+          #dpm( var_export($res->json(), true) );
+          drupal_set_message('bamboo updated');
+        }
+        return $res->json();
+
+      } catch (RequestException $e) {
+        if ($verbose > 0) {
+          #echo $e->getRequest();
+          if ($e->hasResponse()) {
+            if ($e->getResponse()->getStatusCode()==404) { // or 409?
+              drupal_set_message( 'mesos: ' . $e->getResponse()->json()['message']  );
+            } else {
+              drupal_set_message( 'updateBamboo ' . $e->getResponse()->getStatusCode()
+                . ' ' . $e->getResponse()->getReasonPhrase()
+                . ': ' . $e->getResponse()->json()['message']  );
+              #dpm( var_export( $e->getResponse(), true) );
+              #dpm(  $e->__toString() );
+            }
+          }
+        }
+        throw($e);    // abort  downstream
+      }
     }
 
 
@@ -128,7 +202,9 @@ class Mesos
         #dpm('mesos deleteApp ' . $this->marathon_name);
         $res = $this->client->delete($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '']);
         #dpm( var_export($res->json(), true) );
+        $this->deleteBamboo($verbose);
         return $res->json();
+
       } catch (RequestException $e) {
         if ($verbose > 0) {
           #echo $e->getRequest();
@@ -146,20 +222,20 @@ class Mesos
       } 
     }
 
-    public function createApp() {
+    public function createApp($cont, $verbose=1) {
       $url = $this->mserver . 'v2/apps';
       $data = array(
         'id' => $this->marathon_name,
-        'cmd' => '/start.sh',
+        'cmd' => $cont['cmd'],
         'cpus' => 0.5,
-        'mem' => 256.0,   // todo: parameter
+        'mem' => isset($cont['mem']) ? $cont['mem'] :  512.0,
         'container' => [ 
           'type' => 'DOCKER',
           'docker' => [ 
-            'image' => 'boran/drupal',   // todo: parameter
+            'image' => $cont['image'],
             'network' => 'BRIDGE',
             'portMappings' => [[
-              'containerPort' =>80,    // todo: parameter
+              'containerPort' =>$cont['port'],  
               'hostPort'=>0, 
             ]]
           ]
@@ -167,20 +243,31 @@ class Mesos
       );
       #dpm($data['container']['docker']);
       $data = json_encode($data);
+dpm($cont);
       try {
-        #dpm($url);
-        #dpm( var_export($data, true) );
+        #dpm($url); dpm( var_export($data, true) );
         $res = $this->client->post($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'headers' => ['Content-Type' => 'application/json'], 'body' => $data ]);
+        watchdog('webfact', 'mesos createApp ' . $this->id);
+        $this->updateBamboo($cont['url']);        // update bamboo
         #dpm('Mesos create, answer:');
         #dpm( var_export($res->json(), true) );
+
+        // save the current app name used by marathon
+        if (empty($this->website->field_marathon_name['und'][0]['safe_value']) ) {
+          $this->website->field_marathon_name['und'][0]['value'] = $this->marathon_name;
+          node_save($this->website);     // Save the updated node
+          $this->website=node_load($this->website->nid);  // reload cache
+          watchdog('webfact', 'mesos save field_marathon_name for ' . $this->id);
+        }
         return $res->json();
+
       } catch (RequestException $e) {
           #echo $e->getRequest();
-          if ($e->hasResponse()) {
+          if ($e->hasResponse() && ($verbose > 0)) {
             if ($e->getResponse()->getStatusCode()==409) {
-              dpm( $e->getResponse()->json()['message']  );
+              drupal_set_message( $e->getResponse()->json()['message']  );
             } else {
-              dpm( $e->getResponse()->getStatusCode()
+              dupal_set_message( $e->getResponse()->getStatusCode()
                 . ', ' . $e->getResponse()->getReasonPhrase() 
                 . ': ' . $e->getResponse()->json()['message']  );
               #dpm( var_export( $e->getResponse(), true) );

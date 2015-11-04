@@ -84,9 +84,9 @@ function webfact_admin_settings() {
     '#collapsed' => TRUE,
   );
   $form['webfact_fieldset_server']['webfact_fserver'] = array(
-    '#title' => t('Domain prefix'),
+    '#title' => t('Domain postfix'),
     '#default_value' => variable_get('webfact_fserver', array('')),
-    '#description' => t('e.g. webfact.example.ch'),
+    '#description' => t('The part of the URL after the hostname, e.g. webfact.example.ch'),
     '#type' => 'textfield',
     '#size' => 30,
     '#maxlength' => 100,
@@ -96,7 +96,7 @@ function webfact_admin_settings() {
     '#default_value' => variable_get('webfact_dserver', array('')),
     '#description' => t('e.g. unix:///var/run/docker.sock or http://dock.example.ch:2375'),
     '#type' => 'textfield',
-    '#size' => 30,
+    '#size' => 40,
     '#maxlength' => 100,
   );
 
@@ -105,7 +105,7 @@ function webfact_admin_settings() {
     '#default_value' => variable_get('webfact_mserver', array('')),
     '#description' => t('e.g. http://mesos.example.ch:8080. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
-    '#size' => 30,
+    '#size' => 40,
     '#maxlength' => 100,
   );
   $form['webfact_fieldset_server']['webfact_bserver'] = array(
@@ -113,7 +113,7 @@ function webfact_admin_settings() {
     '#default_value' => variable_get('webfact_bserver', array('')),
     '#description' => t('e.g. http://bamboo.example.ch:8000. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
-    '#size' => 30,
+    '#size' => 40,
     '#maxlength' => 100,
   );
 

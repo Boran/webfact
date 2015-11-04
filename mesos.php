@@ -55,7 +55,7 @@ class Mesos
       #watchdog('webfact', 'mesos: connect to ' . $this->mserver . ' for ' . $this->marathon_name);
 
       // todo: drupal setting, or per template or webiste?
-      $this->url_postfix='mesos-dev.vptt.ch';
+      $this->url_postfix='.mesos-dev.vptt.ch';
     }
 
 
@@ -243,7 +243,7 @@ class Mesos
       );
       #dpm($data['container']['docker']);
       $data = json_encode($data);
-dpm($cont);
+// XXdpm($cont);
       try {
         #dpm($url); dpm( var_export($data, true) );
         $res = $this->client->post($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'headers' => ['Content-Type' => 'application/json'], 'body' => $data ]);
@@ -271,7 +271,7 @@ dpm($cont);
                 . ', ' . $e->getResponse()->getReasonPhrase() 
                 . ': ' . $e->getResponse()->json()['message']  );
               #dpm( var_export( $e->getResponse(), true) );
-              dpm(  $e->__toString() );
+              #dpm(  $e->__toString() );
               #dpm(  $e->getResponse()->getReasonPhrase() );
               #dpm(  $e->getResponse()->json()['message'] );
               #dpm(  $e->getResponse()->getBody() );

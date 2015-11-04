@@ -99,14 +99,24 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
+
   $form['webfact_fieldset_server']['webfact_mserver'] = array(
     '#title' => t('Mesos/Marathon API URL'),
     '#default_value' => variable_get('webfact_mserver', array('')),
-    '#description' => t('e.g. http://mesos.example.ch:8000. Leave empty if mesos is not used to manage containers'),
+    '#description' => t('e.g. http://mesos.example.ch:8080. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
     '#size' => 30,
     '#maxlength' => 100,
   );
+  $form['webfact_fieldset_server']['webfact_bserver'] = array(
+    '#title' => t('Mesos/Bamboo API URL'),
+    '#default_value' => variable_get('webfact_bserver', array('')),
+    '#description' => t('e.g. http://bamboo.example.ch:8000. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
+
   $form['webfact_fieldset_server']['webfact_loglines'] = array(
     '#title' => t('How many lines to tail on logs'),
     '#default_value' => variable_get('webfact_loglines', array('')),

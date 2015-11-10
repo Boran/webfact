@@ -289,6 +289,8 @@ END;
                   <li><a href="$wpath/containers/$this->nid">Containers</a></li>
                   <li><a href="$wpath/images/$this->nid">Images</a></li>
                   <li class="divider"></li>
+                  <li><a href="$wpath/mesos/$this->nid">Mesos</a></li>
+                  <li class="divider"></li>
                   $tlink
                   <li><a href="$wpath/processes/$this->nid">Container processes</a></li>
                   <li><a href="$wpath/kill/$this->nid">Container kill</a></li>
@@ -476,6 +478,9 @@ END;
 
 
   public function stopContainer($name) {
+     if ($this->container_api == 1) { // mesos 
+       return;
+     }
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
      if (!$container) {
@@ -490,6 +495,9 @@ END;
 
   // todo: should be protected, due to $this
   public function startContainer($name) {
+     if ($this->container_api == 1) { // mesos 
+       return;
+     }
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
      if (!$container) {
@@ -534,6 +542,12 @@ END;
    */
   protected function renameContainer($old, $newname, $verbose) {
      watchdog('webfact', "renameContainer $old to $newname" . ' by ' . $this->user);
+     if ($this->container_api == 1) { // mesos 
+       //
+
+     } else {
+
+     // else docker API
      $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
      $olddir = $sitesdir . $old;
      $newdir = $sitesdir . $newname;
@@ -587,6 +601,8 @@ END;
 
      # b) rename container
      $manager->rename($container, $newname);
+
+     }  // if docker
 
      # c) rename metadata
      $this->website->field_hostname['und'][0]['value'] = $newname;
@@ -1085,7 +1101,6 @@ END;
     }
     $this->id=$this->website->field_hostname['und'][0]['safe_value'];
 
-// XX
     $runstatus=$this->getContainerDockerStatus();
 
     // grab some more key run info
@@ -1476,16 +1491,18 @@ END;
       }
 
       else if ($this->action=='mesos') {
-        $this->markup = "<pre>Mesos server :\n\n" ;
-        $this->markup .= "----- Apps\t\t\n";
+        $this->markup = "<pre>Mesos server :\n" ;
         $mesos = new Mesos($this->nid);
+        $this->markup .= "\n\n----- Apps\t\t\n";
         $this->markup .= var_export($mesos->getApps(), true);
-        $this->markup .= "\n\n----- Tasks\n";
+        $this->markup .= "\n\n\n----- Tasks\n";
         $this->markup .= var_export($mesos->getTasks(), true);
-        $this->markup .= "\n\n----- Groups\n";
+        $this->markup .= "\n\n\n----- Groups\n";
         $this->markup .= var_export($mesos->getGroups(), true);
-        $this->markup .= "\n\n----- Deployments\n";
+        $this->markup .= "\n\n\n----- Deployments\n";
         $this->markup .= var_export($mesos->getDeployments(), true);
+        $this->markup .= "\n\n\n----- Version\n";
+        $this->markup .= var_export($mesos->getVersion(), true);
         $this->markup .= "</pre>" ;
         return;
       }

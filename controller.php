@@ -50,7 +50,7 @@ class WebfactController {
     $this->fqdn = '';
     $this->is_drupal = 1;
     $this->done_per = 100;
-    $this->container_api = 0;
+    $this->container_api = variable_get('webfact_container_api', 0); // default is docker API
 
     # Load configuration defaults, override in settings.php or on admin/config/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
@@ -81,10 +81,12 @@ class WebfactController {
     $destination = drupal_get_destination();
     $this->des = '?destination=' . $destination['destination']; // remember where we were
 
-    // define docker connection params
-    $this->client = new Docker\Http\DockerClient(array(), $this->dserver);
-    $this->client->setDefaultOption('timeout', variable_get('webfact_api_timeout', 30)); 
-    $this->docker = new Docker\Docker($this->client);
+    if ($this->container_api == 0) {  // docker API
+      // define docker connection params
+      $this->client = new Docker\Http\DockerClient(array(), $this->dserver);
+      $this->client->setDefaultOption('timeout', variable_get('webfact_api_timeout', 30)); 
+      $this->docker = new Docker\Docker($this->client);
+    }
 
     // api call: load minimal website infos: node, container name
     if ($nid>0) { 
@@ -321,9 +323,9 @@ END;
 
 // XX
   protected function getContainerDockerStatus() {
-    if (!empty($this->website->field_container_api['und'][0]['value']) ) {
-      $this->container_api = $this->website->field_container_api['und'][0]['value'];
-    }
+    //if (!empty($this->website->field_container_api['und'][0]['value']) ) {
+    //  $this->container_api = $this->website->field_container_api['und'][0]['value'];
+    //}
 
     if ($this->container_api == 0) {  // docker API
       // get container and status
@@ -1023,6 +1025,9 @@ END;
    *  max number of bytes to read from the result
    */
   public function runCommand($cmd, $id='', $maxlength=8192, $verbose=0) {
+    if ($this->container_api == 1) {  // mesos
+      return('not available for mesos');
+    }
     if (strlen($id)<1) {
       $id = $this->id;
     }
@@ -1376,8 +1381,10 @@ END;
   protected function contAction($verbose=1) {
     #watchdog('webfact', "contAction() $this->action");
     try {
-      $manager = $this->docker->getContainerManager();
-      $container = $manager->find($this->id);
+      if ($this->container_api==0) {
+        $manager = $this->docker->getContainerManager();
+        $container = $manager->find($this->id);
+      }
 
       // delete meta data and container
       if ($this->action=='deleteall') {
@@ -2280,7 +2287,9 @@ END;
     $part2 = '';
 
     try {
-      $manager = $this->docker->getContainerManager();
+      if ($this->container_api==0) {
+        $manager = $this->docker->getContainerManager();
+      }
 
       // container operations must have a node and container
       switch ($action) {

@@ -77,8 +77,51 @@ function webfact_menu() {
 
 // admin form
 function webfact_admin_settings() {
+
+  $form['webfact_fieldset_serverapi'] = array(
+    '#title' => t('Server API'),
+    '#description' => t('The Webfactory can manage containers on either a Mesos or Docker server.'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_serverapi']['webfact_container_api'] = array(
+    '#title' => t('Server API type'),
+    '#type' => 'select',
+    '#options' => array(
+          0 => t('Docker API'),
+         1 => t('Mesos API'),
+    ),
+    '#default_value' => variable_get('webfact_serverapi', array('0')),
+  );
+  $form['webfact_fieldset_serverapi']['webfact_dserver'] = array(
+    '#title' => t('Docker API URL'),
+    '#default_value' => variable_get('webfact_dserver', array('')),
+    '#description' => t('e.g. unix:///var/run/docker.sock or http://dock.example.ch:2375'),
+    '#type' => 'textfield',
+    '#size' => 40,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_serverapi']['webfact_mserver'] = array(
+    '#title' => t('Mesos/Marathon API URL'),
+    '#default_value' => variable_get('webfact_mserver', array('')),
+    '#description' => t('e.g. http://mesos.example.ch:8080. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 40,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_serverapi']['webfact_bserver'] = array(
+    '#title' => t('Mesos/Bamboo API URL'),
+    '#default_value' => variable_get('webfact_bserver', array('')),
+    '#description' => t('e.g. http://bamboo.example.ch:8000. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 40,
+    '#maxlength' => 100,
+  );
+
+
   $form['webfact_fieldset_server'] = array(
-    '#title' => t('Server container'),
+    '#title' => t('Webfactory UI container'),
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
@@ -91,32 +134,6 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
-  $form['webfact_fieldset_server']['webfact_dserver'] = array(
-    '#title' => t('Docker API URL'),
-    '#default_value' => variable_get('webfact_dserver', array('')),
-    '#description' => t('e.g. unix:///var/run/docker.sock or http://dock.example.ch:2375'),
-    '#type' => 'textfield',
-    '#size' => 40,
-    '#maxlength' => 100,
-  );
-
-  $form['webfact_fieldset_server']['webfact_mserver'] = array(
-    '#title' => t('Mesos/Marathon API URL'),
-    '#default_value' => variable_get('webfact_mserver', array('')),
-    '#description' => t('e.g. http://mesos.example.ch:8080. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
-    '#type' => 'textfield',
-    '#size' => 40,
-    '#maxlength' => 100,
-  );
-  $form['webfact_fieldset_server']['webfact_bserver'] = array(
-    '#title' => t('Mesos/Bamboo API URL'),
-    '#default_value' => variable_get('webfact_bserver', array('')),
-    '#description' => t('e.g. http://bamboo.example.ch:8000. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
-    '#type' => 'textfield',
-    '#size' => 40,
-    '#maxlength' => 100,
-  );
-
   $form['webfact_fieldset_server']['webfact_loglines'] = array(
     '#title' => t('How many lines to tail on logs'),
     '#default_value' => variable_get('webfact_loglines', array('')),
@@ -190,7 +207,6 @@ function webfact_admin_settings() {
     '#return_value' => 1,
   );
 
-
   $form['webfact_fieldset_cont']['webfact_data_volume'] = array(
     '#title' => t('Create a volume /data mapped to /opt/sites/CONTAINERNAME/data on the docker server'),
     '#default_value' => variable_get('webfact_data_volume', 1),
@@ -201,8 +217,15 @@ function webfact_admin_settings() {
 
 
   $form['webfact_fieldset_rproxy'] = array(
-    '#title' => t('Reverse proxy'),
-    '#description' => t('Settings for the proxy container responsbile for virtual name mapping.'),
+    '#title' => t('Docker API - Reverse proxy'),
+    '#description' => t('Docker API: Settings for the proxy container responsbile for virtual name mapping.'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_rproxy'] = array(
+    '#title' => t('Docker Reverse proxy'),
+    '#description' => t('Docker API: Settings for the proxy container responsbile for virtual name mapping.'),
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,

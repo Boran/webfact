@@ -90,7 +90,7 @@ function webfact_admin_settings() {
     '#type' => 'select',
     '#options' => array(
           0 => t('Docker API'),
-         1 => t('Mesos API'),
+         1 => t('Mesos/Marathon API'),
     ),
     '#default_value' => variable_get('webfact_serverapi', array('0')),
   );

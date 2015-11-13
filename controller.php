@@ -42,7 +42,6 @@ class WebfactController {
       global $user;
       $account = $user;
     }
-    #watchdog('webfact', 'WebfactController __construct()');
     $this->markup = '';
     $this->verbose = 1;
     $this->category = 'none';
@@ -51,6 +50,7 @@ class WebfactController {
     $this->is_drupal = 1;
     $this->done_per = 100;
     $this->container_api = variable_get('webfact_container_api', 0); // default is docker API
+    #watchdog('webfact', 'WebfactController __construct() ' .  $this->container_api);
 
     # Load configuration defaults, override in settings.php or on admin/config/webfact
     $this->cont_image= variable_get('webfact_cont_image', 'boran/drupal');
@@ -99,7 +99,9 @@ class WebfactController {
 
 
   public function getContainerManager() {
-    return $this->docker->getContainerManager();
+    if ($this->container_api == 0) {  // docker API
+      return $this->docker->getContainerManager();
+    }
   }
   public function getImageManager() {
     return $this->docker->getImageManager();
@@ -376,15 +378,15 @@ END;
         #}
 
         #echo $e->getRequest();
-        if ($e->hasResponse()) {
+        if (($this->container_api==0) && ($e->hasResponse())) {
           if ($e->getResponse()->getStatusCode()==404) {
             $runstatus='mesos-no container';
           } else {
-            dpm( ' :: ' . $e->getResponse()->getStatusCode()
+            drupal_set_message( ' :: ' . $e->getResponse()->getStatusCode()
               . ', ' . $e->getResponse()->getReasonPhrase()
               . ': ' . $e->getResponse()->json()['message']  );
             #dpm( var_export( $e->getResponse(), true) );
-            dpm(  $e->__toString() );
+            drupal_set_message(  $e->__toString() );
           }
           #throw($e);    // abort  downstream
         }
@@ -440,10 +442,12 @@ END;
   public function deleteContainerDB($nid, $name) {
      watchdog('webfact', "deleteContainerDB $name" . ' by ' . $this->user);
      $manager = $this->getContainerManager();
-     $container = $manager->find($name);
-     if (!$container) {
-       watchdog('webfact', "deleteContainerDB $name - no such container");
-       return;
+     if ($this->container_api == 0) {  // docker API
+       $container = $manager->find($name);
+       if (!$container) {
+         watchdog('webfact', "deleteContainerDB $name - no such container");
+         return;
+       }
      }
      $this->nid = $nid;  // needed for extdb()
      $this->id = $name;  // needed for extdb()
@@ -452,30 +456,32 @@ END;
 
 
   public function deleteContainerData($nid, $name) {
-     $manager = $this->getContainerManager();
-     $container = $manager->find($name);
-     if (!$container) {
-       watchdog('webfact', "deleteContainerData $name - no such container");
-       return;
-     }
-     if  (!isset($container->getRuntimeInformations()['State']) 
-       || $container->getRuntimeInformations()['State']['Running'] == FALSE) {
-       watchdog('webfact', "deleteContainerData - container must be running");
-       return;
-     }
-     watchdog('webfact', "deleteContainerData $name /data and " . $this->webroot);
-     $cmd = 'cd ' . $this->webroot . ' && rm -rf * .[a-zA-Z0-9]* ';
-     $logs = $this->runCommand($cmd);
-     $cmd = 'cd /data && rm -rf * .[a-zA-Z0-9]* ';
-     $logs = $this->runCommand($cmd);
+     if ($this->container_api == 0) {  // docker API
+       $manager = $this->getContainerManager();
+       $container = $manager->find($name);
+       if (!$container) {
+         watchdog('webfact', "deleteContainerData $name - no such container");
+         return;
+       }
+       if  (!isset($container->getRuntimeInformations()['State']) 
+         || $container->getRuntimeInformations()['State']['Running'] == FALSE) {
+         watchdog('webfact', "deleteContainerData - container must be running");
+         return;
+       }
+       watchdog('webfact', "deleteContainerData $name /data and " . $this->webroot);
+       $cmd = 'cd ' . $this->webroot . ' && rm -rf * .[a-zA-Z0-9]* ';
+       $logs = $this->runCommand($cmd);
+       $cmd = 'cd /data && rm -rf * .[a-zA-Z0-9]* ';
+       $logs = $this->runCommand($cmd);
 
-     $serverdir = variable_get('webfact_server_sitesdir', '/opt/sites/') . $this->id;
-     watchdog('webfact', "remove top directories $serverdir");
-     if (! rmdir($serverdir . '/www') )  { watchdog('webfact', "cannot delete " . $serverdir . '/www'); }
-     if (! rmdir($serverdir . '/data') ) { watchdog('webfact', "cannot delete " . $serverdir . '/data'); }
-     if (! rmdir($serverdir          ) ) { watchdog('webfact', "cannot delete " . $serverdir          ); }
-     watchdog('webfact', "deleteContainerData $name - " . $this->webroot);
-     return($logs);      // todo: review
+       $serverdir = variable_get('webfact_server_sitesdir', '/opt/sites/') . $this->id;
+       watchdog('webfact', "remove top directories $serverdir");
+       if (! rmdir($serverdir . '/www') )  { watchdog('webfact', "cannot delete " . $serverdir . '/www'); }
+       if (! rmdir($serverdir . '/data') ) { watchdog('webfact', "cannot delete " . $serverdir . '/data'); }
+         if (! rmdir($serverdir          ) ) { watchdog('webfact', "cannot delete " . $serverdir          ); }
+       watchdog('webfact', "deleteContainerData $name - " . $this->webroot);
+       return($logs);      // todo: review
+     }
   }
 
 
@@ -907,8 +913,10 @@ END;
     //
     // get category:
     if (isset($this->website->field_category['und'][0]['tid'])) {
+#dpm($this->website->field_category['und'][0]['tid']);
       $category=taxonomy_term_load($this->website->field_category['und'][0]['tid']);
-      if (strlen($category->name) > 1) {
+#dpm($category);
+      if ((isset($category->name)) && (strlen($category->name) > 1) ) {
         $this->category = $category->name;
       }
     }
@@ -1026,7 +1034,7 @@ END;
    */
   public function runCommand($cmd, $id='', $maxlength=8192, $verbose=0) {
     if ($this->container_api == 1) {  // mesos
-      return('not available for mesos');
+      return(''); // not available for mesos
     }
     if (strlen($id)<1) {
       $id = $this->id;
@@ -1262,7 +1270,7 @@ END;
       $nodechanged=1;
     }
 
-
+#dpm($this->website);
     // get current mysql password, if there is one, from the website node
     if (!empty($this->website->field_docker_environment['und']) ) {
       foreach ($this->website->field_docker_environment['und'] as $row) {
@@ -1427,14 +1435,16 @@ END;
           $this->message("$this->id is categorised as production, deleting not allowed.", 'warning');
           return;
         }
-        if (! $container) {
-          $this->message("$this->id does not exist",  'error');
-          return;
-        }
-        else if ($container->getRuntimeInformations()['State']['Running'] != TRUE) {
-          if ($this->verbose===1) {
-            $this->message("$this->id must be running first", 'warning');
+        if ($this->container_api == 0)  {
+          if (! isset($container)) {
+            $this->message("Docker API: container reference $this->id does not exist",  'error');
             return;
+          }
+          else if ($container->getRuntimeInformations()['State']['Running'] != TRUE) {
+            if ($this->verbose===1) {
+              $this->message("$this->id must be running first", 'warning');
+                return;
+            }
           }
         }
         $this->deleteContainerDB($this->nid, $this->id);
@@ -1921,15 +1931,17 @@ END;
 
       else if ($this->action=='rebuild') {
         global $base_root;
-        $this->client->setDefaultOption('timeout', 180);
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
           return;
         }
-        if (! $container) {
-          $this->message("$this->id does not exist. Use Create rather then Rebuild.", 'warning');
-          return;
+        if ($this->container_api == 0) {
+          $this->client->setDefaultOption('timeout', 180);
+          if (! $container) {
+            $this->message("$this->id does not exist. Use Create rather then Rebuild.", 'warning');
+            return;
+          }
         }
 
         // Rebuilding via batch API
@@ -2221,7 +2233,7 @@ END;
       $this->message('Unknown RequestException to docker', 'warning');
 
     } catch (Exception $e) {
-      if ($e->hasResponse()) {
+      if (($this->container_api==0) && ($e->hasResponse())) {
         // user friendly error messages
         if ( ($this->action=='create') && ($e->getResponse()->getStatusCode() == '409') ) {
           $this->message("Container already exists", 'warning');

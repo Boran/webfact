@@ -225,13 +225,34 @@ class Mesos
 
     public function createApp($cont, $verbose=1) {
       $url = $this->mserver . 'v2/apps';
+      // todo more generic data array with variables
       $data = array(
         'id' => $this->marathon_name,
         'cmd' => $cont['cmd'],
         'cpus' => 0.5,
         'mem' => isset($cont['mem']) ? $cont['mem'] :  512.0,
+        'healthChecks' => [[
+            "path" => "/",
+            "protocol" => "TCP",
+            "gracePeriodSeconds" => 120,
+            "intervalSeconds" => 5,
+            "timeoutSeconds" => 10,
+            "maxConsecutiveFailures" => 3
+        ]],
         'container' => [ 
           'type' => 'DOCKER',
+          'volumes' => [
+             [
+                 'containerPath' => '/data',
+                 'hostPath'      => "/opt/nova/sites/$this->marathon_name/data",
+                 'mode'          => 'RW'
+             ],
+             [
+                 'containerPath' => '/var/www/html',
+                 'hostPath'      => "/opt/nova/sites/$this->marathon_name/www",
+                 'mode'          => 'RW'
+             ]
+          ],
           'docker' => [ 
             'image' => $cont['image'],
             'network' => 'BRIDGE',

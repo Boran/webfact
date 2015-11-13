@@ -33,7 +33,7 @@ function batchSaveCont($nid, $name, $force=0, &$context) {
 function batchRemoveCont($nid, $title, $log=1, &$context) {
   $context['finished'] = 0;
   watchdog('webfact', "batchRemoveCont $nid, $title");
-  $w= new WebfactController;
+  $w= new WebfactController(false, $nid);
   $w->deleteContainer($nid, $title, $log);
   if ($log>0) {
     $context['results']['log'][] = 'deleted ' . check_plain($title);
@@ -277,7 +277,7 @@ function batchRebuildDone($success, $results, $operations) {
     # if ($results['buildstatus']==100 || $results['buildstatus']==200) {
       $message = t('Container created, you can visit the new website');
     } else {
-      $message = t('Container created, installation may still be running in the background. Follow the Build Status below, or visit the logs page.');
+      $message = t('Container created, installation may still be running in the background. Follow the Build Status, Inspect, or visit the logs.');
     }
   }
   else {

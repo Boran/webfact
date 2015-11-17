@@ -237,7 +237,6 @@ END;
                   <li class="divider"></li>
                   $docker_logs
                   $drupal_logs
-                  <li class="divider"></li>
                   <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Choose if there is no persistent data within the container. Are you sure?')">Delete container</a></li>
                   $deletewww
                   <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, docker image backups, linked database (if any), webroot volume contents and this meta data. Are you REALLY sure?')">Delete everything: container, data, ..</a></li>
@@ -257,8 +256,9 @@ END;
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild1_msg')">Rebuild container </a></li>
                   <li><a href="$wpath/rebuild2/$this->nid" onclick="return confirm('$rebuild2_msg')">Rebuild, commit backup image first </a></li>
                   <li><a href="$wpath/rebuild3/$this->nid" onclick="return confirm('$rebuild3_msg')">Rebuild, wipe data (for test containers) </a></li>
+     <!-- DockerAPI only
                   <li class="divider"></li>
-                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild4_msg')">Rebuild with persistence</a></li>
+                  <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild4_msg')">Rebuild with persistence</a></li> -->
                   <li class="divider"></li>
                   <li><a href="$wpath/corename/$this->nid">Rename container</a></li>
                   <li class="divider"></li>
@@ -509,8 +509,18 @@ END;
   }
 
 
+  public function stopContainerByNid($nid) {
+     if ($this->container_api == 1) { // mesos 
+       $mesos = new Mesos($this->nid);
+       $result = $mesos->stopApp();  //deploymentId version
+     }
+     return;
+  }
   public function stopContainer($name) {
      if ($this->container_api == 1) { // mesos 
+       // how to stop by name?
+       $mesos = new Mesos($this->nid);
+       $result = $mesos->stopApp();  //deploymentId version
        return;
      }
      $manager = $this->getContainerManager();
@@ -1423,6 +1433,7 @@ END;
         watchdog('webfact', 'deleteall ' . $this->id . 
           ', node id=' . $this->nid . ' by ' . $this->user);
         // without the batch API:
+        $this->stopContainerByNid($this->nid);
         $this->deleteContainer($this->nid, $this->id, 2);
         $this->deleteContainerData($this->nid, $this->id, 1);
         $this->deleteContainerDB($this->nid, $this->id, 1);
@@ -1464,6 +1475,7 @@ END;
             }
           }
         }
+        $this->stopContainerByNid($this->nid);
         $logs = $this->deleteContainerData($this->nid, $this->id, 1);
         $this->touch_node_date();
         $this->deleteContainerDB($this->nid, $this->id, 1);
@@ -1510,10 +1522,12 @@ END;
           batch_set($batch);
           batch_process('website/advanced/' . $this->website->nid); // go here when done
           */
+          $this->stopContainerByNid($this->nid);
           $this->deleteContainer($this->nid, $this->id, 2);
           drupal_goto("/website/advanced/$this->nid"); // show new status
 
         } else if ($this->action=='delete') {     // todo: still used?
+          $this->stopContainerByNid($this->nid);
           $this->deleteContainer($this->nid, $this->id);
           if ($this->verbose===1) {
             drupal_goto("/website/advanced/$this->nid"); // show new status
@@ -1897,6 +1911,10 @@ END;
 
 
       else if ($this->action=='rebuildmeta') {
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          return;
+        }
         global $base_root;
         $this->touch_node_date();
         $this->client->setDefaultOption('timeout', 60);
@@ -2009,28 +2027,7 @@ END;
 
 
       /* batchAPI wrapper around "create" for progress bar */
-      else if ($this->action=='createui') {
-
-// XX
-/*      if ($this->container_api == 1) {
-      //try {
-	$this->message('Meos: creating ..' );
-        $mesos = new Mesos($this->nid);
-        $result = $mesos->createApp();
-        $this->message('created, Deployment id=' . $result['deployments'][0]['id'] );
-        #dpm( var_export($result['container']['docker'], true) );
-        #dpm( var_export($result, true) );
-
-        $this->touch_node_date();
-        if ($verbose == 1) {
-          $this->message($msg, 'status', 2);
-          $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
-          $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
-          $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
-          drupal_goto("/website/advanced/$this->nid"); // show new status
-        }
-      } else {
-*/
+      else if ($this->action=='createui') { // docker API only
         $batch = array(
           'title' => t('Creating ' . $this->id),
           'operations' => array(
@@ -2051,85 +2048,10 @@ END;
         batch_process('website/advanced/' . $this->website->nid); // go here when done
         $this->touch_node_date();
        }
- //     }
-
 
 
       else if ($this->action=='create') {
         $this->createContainer($verbose);
-/*
-        $this->extdb('create', $verbose);  // if an an external DB is needed
-
-      if ($this->container_api == 1) {  // mesos API
-      //try {
-        $this->message('Meos: creating ..' );
-        $mesos = new Mesos($this->nid);
-        $result = $mesos->createApp();
-        $this->message('created, Deployment id=' . $result['deployments'][0]['id'] );
-        #dpm( var_export($result['container']['docker'], true) );
-        #dpm( var_export($result, true) );
-      } catch (Exception $e) {
-        if ($e->hasResponse()) {
-          $this->message('FOO:' . $e->getResponse()->getReasonPhrase() .
-            " (error code " . $e->getResponse()->getStatusCode(). " for action=$action in arguments())" , 'warning');
-          $this->message("Response details: " . $e->getResponse()->__toString(), 'warning', 3);
-        }
-        else {
-          $this->message($e->getMessage(), 'error');
-        }
-      }
-
-      } else {  // docker API
-
-        // create the container
-        $config = ['Image'    => $this->cont_image, 
-                   # Dont use any more: 'Hostname' => $this->fqdn,
-                   'Env'      => $this->docker_env, 
-                   //'Volumes'  => [ '/data' => array() ],
-                   'Volumes'  => $this->docker_vol,
-        ];
-        #dpm('--create: config--');
-        #dpm($config);
-        $container= new Docker\Container($config);
-        $container->setName($this->id);
-        if ($verbose == 1) {
-          $this->message("create $this->id from $this->cont_image", 'status', 3);
-        }
-        $manager->create($container);
-        if ($verbose == 1) {
-          $this->message("start ", 'status', 3);
-        }
-        #dpm('--create2--');
-        if ($this->cont_mem > 0) {
-          $this->startconfig['Memory'] = $this->cont_mem;
-          watchdog('webfact', 'container->setMemory ' . $this->cont_mem);
-        }
-        #dpm($this->startconfig);
-        $manager->start($container, $this->startconfig);
-      }
-
-      // both APIS
-        $msg= "$this->action $this->id: title=" . $this->website->title
-          . ", docker image=$this->cont_image" . ' by ' . $this->user;
-        watchdog('webfact', $msg);
-        $this->touch_node_date();
-
-        if ($verbose == 1) {
-          $this->message($msg, 'status', 2);
-          // inform user:
-          $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
-          $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
-          $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
-
-          // TODO: do some ajax to query the build status and confirm when done
-          #$this->message("Build=" .$this->getContainerBuildStatus());
-          #if ($this->getContainerBuildStatus() == 100) {
-          #  $this->message("Build finished");
-          #}
-          drupal_goto("/website/advanced/$this->nid"); // show new status
-          #drupal_goto("/website/logs/$this->nid"); // show new status
-        }
-*/
         if ($verbose == 1) {
           drupal_goto("/website/advanced/$this->nid"); // show new status
         }
@@ -2184,7 +2106,6 @@ END;
       }
 
       else if ($this->action=='stop') {
-// XX
         if ($this->container_api == 1) { // mesos 
           $mesos = new Mesos($this->nid);
           $result = $mesos->stopApp();  //deploymentId version
@@ -2687,6 +2608,10 @@ END;
 
 
       case 'backuplist':  // list images of current container
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         $this->client->setDefaultOption('timeout', 60);
         // todo: cache the image list for speed
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
@@ -2734,6 +2659,10 @@ END;
         break;
 
       case 'backuplistdelete':  // delete images of current container
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         $this->client->setDefaultOption('timeout', 180);
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
@@ -2828,6 +2757,10 @@ END;
 
 
       case 'couploadfile':     // download a folder from the container
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         $this->client->setDefaultOption('timeout', 300);
         $container = $manager->find($this->id);
         if (! $container) {
@@ -2892,6 +2825,10 @@ END;
 
 
       case 'corename':     // Rename a container
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         $html = <<<END
 <!-- Bootstrap: -->
 <form >
@@ -2949,6 +2886,11 @@ END;
 
 
       case 'cocopyfile':     // download a folder from the container
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          drupal_goto("/website/advanced/$this->nid"); // jump back to  status
+          break;
+        }
         $html = <<<END
 <!-- Bootstrap: -->
 <form >
@@ -3002,6 +2944,10 @@ END;
 
 
       case 'coexport':     // export a container as a tarfile
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         $this->client->setDefaultOption('timeout', 300);
         if (($this->user!=$owner) && (!user_access('manage containers')  )) {
           $this->message("Permission denied, $this->user is not the owner ($owner) or admin", 'error');
@@ -3028,6 +2974,10 @@ END;
 
 
       case 'logtail':
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          break;
+        }
         /* todo: try to do real-time log tailing  DOES NOT WORK YET
          * see http://stackoverflow.com/questions/8765251/printing-process-output-in-realtime
          */

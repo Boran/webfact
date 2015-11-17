@@ -14,6 +14,7 @@ class Mesos
     private $id;   // webfact id for website
     private $website, $marathon_name;
     private $url_postfix;   // Domain part of URL for reverse proxy
+    private $serverdir;
 
     public function __construct($nid)
     {
@@ -56,6 +57,7 @@ class Mesos
 
       // todo: drupal setting, or per template or webiste?
       $this->url_postfix='.mesos-dev.vptt.ch';
+      $this->serverdir = variable_get('webfact_server_sitesdir_host', '/opt/sites/');
     }
 
     /******** bambo ******/
@@ -244,12 +246,12 @@ class Mesos
           'volumes' => [
              [
                  'containerPath' => '/data',
-                 'hostPath'      => "/opt/nova/sites/$this->marathon_name/data",
+                 'hostPath'      => $this->serverdir . "$this->marathon_name/data",
                  'mode'          => 'RW'
              ],
              [
                  'containerPath' => '/var/www/html',
-                 'hostPath'      => "/opt/nova/sites/$this->marathon_name/www",
+                 'hostPath'      => $this->serverdir . "$this->marathon_name/www",
                  'mode'          => 'RW'
              ]
           ],

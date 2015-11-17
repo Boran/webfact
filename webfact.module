@@ -152,7 +152,7 @@ function webfact_admin_settings() {
   );
 
   $form['webfact_fieldset_server']['webfact_server_sitesdir'] = array(
-    '#title' => t('A folder for container mountpoints'),
+    '#title' => t('Folder within the webfact container, where sites are mounted'),
     '#default_value' => variable_get('webfact_server_sitesdir', array('/opt/sites/')),
     '#description' => t('Default is /opt/sites/. When new websites are added, a subfolder is created with the site name. e.g. /data in containers could be mapped to /opt/sites/CONTAINERNAME. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
@@ -199,10 +199,18 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
+  $form['webfact_fieldset_cont']['webfact_server_sitesdir_host'] = array(
+    '#title' => t('Host folder for container mountpoints'),
+    '#default_value' => variable_get('webfact_server_sitesdir_host', array('/opt/sites/')),
+    '#description' => t('Default is /opt/sites/, used as a prefix for the volumes below. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
   $form['webfact_fieldset_cont']['webfact_www_volume'] = array(
-    '#title' => t('Create a volume for the webroot above mapped to /opt/sites/CONTAINERNAME/www on the docker server'),
+    '#title' => t('Create a volume for the webroot above mapped to a subfolder www within the hostfolder above'),
     '#default_value' => variable_get('webfact_www_volume', 1),
-    '#description' => t('Automatically add a standard volume for web files. /opt/sites/CONTAINERNAME/www will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
+    '#description' => t('Automatically add a standard volume for web files, e.g. /opt/sites/CONTAINERNAME/www. It will be created if necessary.'),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
@@ -210,7 +218,7 @@ function webfact_admin_settings() {
   $form['webfact_fieldset_cont']['webfact_data_volume'] = array(
     '#title' => t('Create a volume /data mapped to /opt/sites/CONTAINERNAME/data on the docker server'),
     '#default_value' => variable_get('webfact_data_volume', 1),
-    '#description' => t('Automatically add a standard volume for sharing backups or other infos from container to server. /opt/sites/CONTAINERNAME/data will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
+    '#description' => t('Automatically add a standard volume for sharing backups or other infos from container to server. /opt/sites/CONTAINERNAME/data will be created if necessary.'),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );

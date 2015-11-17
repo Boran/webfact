@@ -31,7 +31,7 @@ class WebfactController {
   protected $done_per;  // status value back from a drupal container when build is finished
   protected $docker_start_vol, $docker_ports, $docker_env, $startconfig;
   protected $actual_restart, $actual_error, $actual_status, $actual_buildstatus;
-  protected $webroot;
+  protected $webroot, $sitesdir, $sitesdir_host;
 
 
   public function __construct($user_id_override = FALSE, $nid=0) {
@@ -66,6 +66,8 @@ class WebfactController {
     $this->msglevel3 = variable_get('webfact_msglevel3', TRUE);  // debug
     $this->cont_mem  = variable_get('webfact_cont_mem', 0);       // default container memory
     $this->webroot   = variable_get('webfact_www_volume_path', '/var/www/html');
+    $this->sitesdir  = variable_get('webfact_server_sitesdir', '/opt/sites/');
+    $this->sitesdir_host  = variable_get('webfact_server_sitesdir_host', '/opt/sites/');
 
     if (isset($account->name)) {
       $this->user= $account->name;
@@ -189,12 +191,18 @@ class WebfactController {
 
     // drupal specific menus
     if ($this->is_drupal==1) {  // enable drupal menus
-      $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
       $coappupdate = <<<END
         <li class="divider"></li>
         <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
 END;
-      $createui  = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
+      if ($this->container_api == 0) {  // docker API
+        $createui  = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
+        $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
+        $docker_logs="<li><a href=$wpath/logs/$this->nid>Docker logs</a></li>";
+      } else {
+        $drupal_logs= $docker_logs ='';
+        $createui  = "<li><a href=$wpath/create/$this->nid>Create</a></li>";
+      }
       $deletewww = "<li><a href=$wpath/deletewww/$this->nid onclick='return confirm(\"Delete persistent data from Drupal containers: Webroot and linked Database. There is no going back, are you sure?\")'>Delete Drupal data (www+DB)</a></li>";
 
     } else {   // non-drupal container
@@ -221,15 +229,17 @@ END;
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Manage<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
                   <li><a href="$wpath/advanced/$this->nid">Status</a></li>
-                  <li><a href="$wpath/logs/$this->nid">Docker logs</a></li>
-                  $drupal_logs
                   <li><a href="$wpath/stop/$this->nid">Stop</a></li>
                   <li><a href="$wpath/start/$this->nid">Start</a></li>
                   <li><a href="$wpath/restart/$this->nid">Restart</a></li>
                   <li class="divider"></li>
                   $createui
                   <li class="divider"></li>
+                  $docker_logs
+                  $drupal_logs
+                  <li class="divider"></li>
                   <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Choose if there is no persistent data within the container. Are you sure?')">Delete container</a></li>
+                  $deletewww
                   <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, docker image backups, linked database (if any), webroot volume contents and this meta data. Are you REALLY sure?')">Delete everything: container, data, ..</a></li>
                 </ul>
               </li>
@@ -246,7 +256,6 @@ END;
                   <li class="divider"></li>
                   <li><a href="$wpath/rebuild/$this->nid" onclick="return confirm('$rebuild1_msg')">Rebuild container </a></li>
                   <li><a href="$wpath/rebuild2/$this->nid" onclick="return confirm('$rebuild2_msg')">Rebuild, commit backup image first </a></li>
-                  $deletewww
                   <li><a href="$wpath/rebuild3/$this->nid" onclick="return confirm('$rebuild3_msg')">Rebuild, wipe data (for test containers) </a></li>
                   <li class="divider"></li>
                   <li><a href="$wpath/rebuildmeta/$this->nid" onclick="return confirm('$rebuild4_msg')">Rebuild with persistence</a></li>
@@ -325,10 +334,6 @@ END;
 
 // XX
   protected function getContainerDockerStatus() {
-    //if (!empty($this->website->field_container_api['und'][0]['value']) ) {
-    //  $this->container_api = $this->website->field_container_api['und'][0]['value'];
-    //}
-
     if ($this->container_api == 0) {  // docker API
       // get container and status
       $manager = $this->getContainerManager();
@@ -368,17 +373,15 @@ END;
         #dpm( $e->getResponse()->json()['message']  );
 
       } catch (Exception $e) {
-        $runstatus='messos-error';
-        // todo: this code is never reached??
-#dpm($e->getMessage());
+        $runstatus='mesos-error';
+        #dpm($e->getMessage());
         #  $this->message('Mesos:' . $e->getResponse()->getReasonPhrase() .
         #    " (error code " . $e->getResponse()->getStatusCode(). " )" , 'warning');
         #else {
         #  $this->message($e->getMessage(), 'error');
         #}
-
         #echo $e->getRequest();
-        if (($this->container_api==0) && ($e->hasResponse())) {
+        if ($e->hasResponse()) {
           if ($e->getResponse()->getStatusCode()==404) {
             $runstatus='mesos-no container';
           } else {
@@ -439,23 +442,27 @@ END;
   }
 
 
-  public function deleteContainerDB($nid, $name) {
-     watchdog('webfact', "deleteContainerDB $name" . ' by ' . $this->user);
-     $manager = $this->getContainerManager();
-     if ($this->container_api == 0) {  // docker API
-       $container = $manager->find($name);
-       if (!$container) {
-         watchdog('webfact', "deleteContainerDB $name - no such container");
-         return;
-       }
-     }
-     $this->nid = $nid;  // needed for extdb()
-     $this->id = $name;  // needed for extdb()
-     $this->extdb('delete', 0);    // delete external db, if configured
+  public function deleteContainerDB($nid, $name, $verbose=0) {
+    watchdog('webfact', "deleteContainerDB $name" . ' by ' . $this->user);
+    if ($this->container_api == 0) {  // docker API
+      $manager = $this->getContainerManager();
+      $container = $manager->find($name);
+      if (!$container) {
+        watchdog('webfact', "deleteContainerDB $name - no such container");
+        return;
+      }
+    }
+    $this->nid = $nid;  // needed for extdb()
+    $this->id = $name;  // needed for extdb()
+    $this->extdb('delete', 0);    // delete external db, if configured
+    if ($verbose > 1) {  // UI message
+      $this->message("deleted database $name");
+    }
   }
 
 
-  public function deleteContainerData($nid, $name) {
+  public function deleteContainerData($nid, $name, $verbose=0) {
+     $serverdir = $this->sitesdir . $this->id;   // mount point within container, hard-coded
      if ($this->container_api == 0) {  // docker API
        $manager = $this->getContainerManager();
        $container = $manager->find($name);
@@ -474,12 +481,29 @@ END;
        $cmd = 'cd /data && rm -rf * .[a-zA-Z0-9]* ';
        $logs = $this->runCommand($cmd);
 
-       $serverdir = variable_get('webfact_server_sitesdir', '/opt/sites/') . $this->id;
        watchdog('webfact', "remove top directories $serverdir");
        if (! rmdir($serverdir . '/www') )  { watchdog('webfact', "cannot delete " . $serverdir . '/www'); }
        if (! rmdir($serverdir . '/data') ) { watchdog('webfact', "cannot delete " . $serverdir . '/data'); }
-         if (! rmdir($serverdir          ) ) { watchdog('webfact', "cannot delete " . $serverdir          ); }
+       if (! rmdir($serverdir          ) ) { watchdog('webfact', "cannot delete " . $serverdir          ); }
        watchdog('webfact', "deleteContainerData $name - " . $this->webroot);
+       return($logs);      // todo: review
+
+     } else if ($this->container_api == 1) { // mesos
+       $cmd=$this->sitesdir . "webfact_rm_site.sh";
+       if (! is_executable($cmd))  { 
+         $logs = 'Cannot execute ' . $cmd;
+         if ($verbose > 1) {  // UI message
+           $this->message($logs);
+         }
+         return($logs);  
+       }
+       watchdog('webfact', "remove directory tree $serverdir via " . "sudo " . $cmd);
+       $logs = exec("sudo $cmd $this->id 2>&1", $outputexec, $resultexec);
+       if ( $resultexec ) { watchdog('webfact', "cannot delete " . $serverdir . "<pre>" . print_r($outputexec, true) . $logs . "</pre> and " . $resultexec, 'error'); }
+       watchdog('webfact', "deleteContainerData $name - done ");
+       if ($verbose > 1) {  // UI message
+         $this->message("deleted data " . $serverdir);
+       }
        return($logs);      // todo: review
      }
   }
@@ -556,9 +580,8 @@ END;
      } else {
 
      // else docker API
-     $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
-     $olddir = $sitesdir . $old;
-     $newdir = $sitesdir . $newname;
+     $olddir = $this->sitesdir . $old;
+     $newdir = $this->sitesdir . $newname;
      $manager = $this->getContainerManager();
 
      // check for name conflict, i.e. newname does not already exist
@@ -666,7 +689,7 @@ END;
     // todo: make sure $id and all "this" stuff is loaded
 
     if ($verbose == 1) {
-      $this->message("docker create $this->id from $this->cont_image", 'status', 3);
+      $this->message("create $this->id from $this->cont_image", 'status', 3);
     }
     $this->extdb('create', $verbose);  // if an an external DB is needed
 
@@ -730,11 +753,11 @@ END;
     $this->touch_node_date();
 
     if ($verbose == 1) {
-      $this->message($msg, 'status', 2);
       // inform user:
+      //$this->message($msg, 'status', 2);
       $cur_time=date("Y-m-d H:i:s");  // calculate now + 6 minutes
-     $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
-     $this->message("Provisioning: you can connect to the new site at $newtime. Select logs to follow progress in real time", 'status');
+      $newtime=date('H:i', strtotime('+6 minutes', strtotime($cur_time))); // todo setting
+      $this->message("Provisioning: you can connect to the new site at $newtime. The status below is updated every 30 secs, alternatively inspect the container or examine logs.", 'status');
 
       // TODO: do some ajax to query the build status and confirm when done
       #$this->message("Build=" .$this->getContainerBuildStatus());
@@ -794,22 +817,17 @@ END;
     }
     if ($this->is_drupal == 1) { 
       // Create a volume mount point automatically?
-      $sitesdir = variable_get('webfact_server_sitesdir', '/opt/sites/');
-      if (empty($sitesdir)) {
-         $sitesdir = '/opt/sites/';
-         variable_set('webfact_server_sitesdir', $sitesdir);
-      }
-      if (! file_exists($sitesdir . $this->id) ) {
+      if (! file_exists($this->sitesdir . $this->id) ) {
         if ((variable_get('webfact_data_volume', 1) == 1 ) || (variable_get('webfact_www_volume', 1) == 1 ) ) {
       
-          if (! mkdir($sitesdir . $this->id, 0775) ) {
-            watchdog('webfact', 'Server folder ' . $sitesdir . $this->id .' could not be created.');
+          if (! mkdir($this->sitesdir . $this->id, 0775) ) {
+            watchdog('webfact', 'Server folder ' . $this->sitesdir . $this->id .' could not be created.');
           }
         }
       }
       if (variable_get('webfact_data_volume', 1) == 1 ) {
         $mount = '/data';     //  todo: make a setting
-        $folder = $sitesdir . $this->id . $mount;
+        $folder = $this->sitesdir_host . $this->id . $mount;
         $this->docker_vol[$mount] = array() ; 
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
         if (! file_exists($folder) ) {
@@ -821,8 +839,7 @@ END;
       }
       if (variable_get('webfact_www_volume', 1) == 1 ) {
         $mount = $this->webroot;
-        #$folder = $sitesdir . $this->id . $mount; //  todo: make a setting?
-        $folder = $sitesdir . $this->id . '/www';
+        $folder = $this->sitesdir_host . $this->id . '/www';
         $this->docker_vol[$mount] = array() ;
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
         if (! file_exists($folder) ) {
@@ -1263,18 +1280,17 @@ END;
       // naming convention for DB & usernames: add a prefix to avoid mysql restrictions
       $newuser = 'u_' . $this->id;
       if (strlen($newuser) > 16) {   // trim username, mysql only allows 16 chars before 5.7.8, later 32
+        watchdog('webfact', "trim mysql user $newuser to 16 chars", 'warning');
         $newuser = substr($newuser, 0, 16);
       }
-      #$this->website->field_docker_environment['und'][1]['value'] = "MYSQL_USER=$newuser";
       $this->website->field_docker_environment['und'][]['value'] = "MYSQL_USER=$newuser";
       $nodechanged=1;
     }
 
-#dpm($this->website);
     // get current mysql password, if there is one, from the website node
     if (!empty($this->website->field_docker_environment['und']) ) {
       foreach ($this->website->field_docker_environment['und'] as $row) {
-        if ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches) ) {
+        if (isset($row['safe_value']) && ( preg_match("/MYSQL_PASSWORD=(.+)/", $row['safe_value'], $matches)) ) {
           $pw=$matches[1]; 
           watchdog('webfact', 'use existing mysql password');
         }
@@ -1313,6 +1329,7 @@ END;
         }
         watchdog('webfact', 'CreateAppDB: ' . $conn->error, array(), WATCHDOG_ERROR);
       }
+
     } else if ($action == 'delete') {
       $cmd="call DeleteAppDB ('$newdb', '$newuser')";
       if (!$conn->query($cmd)) {
@@ -1407,8 +1424,8 @@ END;
           ', node id=' . $this->nid . ' by ' . $this->user);
         // without the batch API:
         $this->deleteContainer($this->nid, $this->id, 2);
-        $this->deleteContainerDB($this->nid, $this->id);
-        $this->deleteContainerData($this->nid, $this->id);
+        $this->deleteContainerData($this->nid, $this->id, 1);
+        $this->deleteContainerDB($this->nid, $this->id, 1);
         node_delete($this->nid); 
         // batchDeleteContImages: create function
 /*
@@ -1447,9 +1464,9 @@ END;
             }
           }
         }
-        $this->deleteContainerDB($this->nid, $this->id);
-        $logs = $this->deleteContainerData($this->nid, $this->id);
+        $logs = $this->deleteContainerData($this->nid, $this->id, 1);
         $this->touch_node_date();
+        $this->deleteContainerDB($this->nid, $this->id, 1);
         $this->markup = "<h3>Results</h3> <pre>$logs</pre>";   // show output
       }
 

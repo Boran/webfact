@@ -96,6 +96,7 @@ BEGIN
     EXECUTE stmt;
 END//
 DELIMITER ;
+grant select on mysql.* to 'webfact_create'@'%';
 grant execute on procedure CreateAppDB to 'webfact_create'@'%';
 grant execute on procedure DeleteAppDB to 'webfact_create'@'%';
 grant execute on procedure RenameAppDB to 'webfact_create'@'%';

@@ -77,24 +77,59 @@ function webfact_menu() {
 
 // admin form
 function webfact_admin_settings() {
+
+  $form['webfact_fieldset_serverapi'] = array(
+    '#title' => t('Server API'),
+    '#description' => t('The Webfactory can manage containers on either a Mesos or Docker server.'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_serverapi']['webfact_container_api'] = array(
+    '#title' => t('Server API type'),
+    '#type' => 'select',
+    '#options' => array(
+          0 => t('Docker API'),
+         1 => t('Mesos/Marathon API'),
+    ),
+    '#default_value' => variable_get('webfact_container_api', 0),
+  );
+  $form['webfact_fieldset_serverapi']['webfact_dserver'] = array(
+    '#title' => t('Docker API URL'),
+    '#default_value' => variable_get('webfact_dserver', array('')),
+    '#description' => t('e.g. unix:///var/run/docker.sock or http://dock.example.ch:2375'),
+    '#type' => 'textfield',
+    '#size' => 40,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_serverapi']['webfact_mserver'] = array(
+    '#title' => t('Mesos/Marathon API URL'),
+    '#default_value' => variable_get('webfact_mserver', array('')),
+    '#description' => t('e.g. http://mesos.example.ch:8080. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 40,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_serverapi']['webfact_bserver'] = array(
+    '#title' => t('Mesos/Bamboo API URL'),
+    '#default_value' => variable_get('webfact_bserver', array('')),
+    '#description' => t('e.g. http://bamboo.example.ch:8000. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 40,
+    '#maxlength' => 100,
+  );
+
+
   $form['webfact_fieldset_server'] = array(
-    '#title' => t('Server container'),
+    '#title' => t('Webfactory UI container'),
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
   $form['webfact_fieldset_server']['webfact_fserver'] = array(
-    '#title' => t('Domain prefix'),
+    '#title' => t('Domain postfix'),
     '#default_value' => variable_get('webfact_fserver', array('')),
-    '#description' => t('e.g. webfact.example.ch'),
-    '#type' => 'textfield',
-    '#size' => 30,
-    '#maxlength' => 100,
-  );
-  $form['webfact_fieldset_server']['webfact_dserver'] = array(
-    '#title' => t('Docker API URL'),
-    '#default_value' => variable_get('webfact_dserver', array('')),
-    '#description' => t('e.g. unix:///var/run/docker.sock or http://dock.example.ch:2375'),
+    '#description' => t('The part of the URL after the hostname, e.g. webfact.example.ch'),
     '#type' => 'textfield',
     '#size' => 30,
     '#maxlength' => 100,
@@ -117,7 +152,7 @@ function webfact_admin_settings() {
   );
 
   $form['webfact_fieldset_server']['webfact_server_sitesdir'] = array(
-    '#title' => t('A folder for container mountpoints'),
+    '#title' => t('Folder within the webfact container, where sites are mounted'),
     '#default_value' => variable_get('webfact_server_sitesdir', array('/opt/sites/')),
     '#description' => t('Default is /opt/sites/. When new websites are added, a subfolder is created with the site name. e.g. /data in containers could be mapped to /opt/sites/CONTAINERNAME. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
@@ -164,27 +199,41 @@ function webfact_admin_settings() {
     '#size' => 30,
     '#maxlength' => 100,
   );
+  $form['webfact_fieldset_cont']['webfact_server_sitesdir_host'] = array(
+    '#title' => t('Host folder for container mountpoints'),
+    '#default_value' => variable_get('webfact_server_sitesdir_host', array('/opt/sites/')),
+    '#description' => t('Default is /opt/sites/, used as a prefix for the volumes below. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
+  );
   $form['webfact_fieldset_cont']['webfact_www_volume'] = array(
-    '#title' => t('Create a volume for the webroot above mapped to /opt/sites/CONTAINERNAME/www on the docker server'),
+    '#title' => t('Create a volume for the webroot above mapped to a subfolder www within the hostfolder above'),
     '#default_value' => variable_get('webfact_www_volume', 1),
-    '#description' => t('Automatically add a standard volume for web files. /opt/sites/CONTAINERNAME/www will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
+    '#description' => t('Automatically add a standard volume for web files, e.g. /opt/sites/CONTAINERNAME/www. It will be created if necessary.'),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
 
-
   $form['webfact_fieldset_cont']['webfact_data_volume'] = array(
     '#title' => t('Create a volume /data mapped to /opt/sites/CONTAINERNAME/data on the docker server'),
     '#default_value' => variable_get('webfact_data_volume', 1),
-    '#description' => t('Automatically add a standard volume for sharing backups or other infos from container to server. /opt/sites/CONTAINERNAME/data will be created if necessary. Note: /opt/sites (exact path is specifed in the server section above) must be mounted as a volume between _this_ webfact container and the docker server.'),
+    '#description' => t('Automatically add a standard volume for sharing backups or other infos from container to server. /opt/sites/CONTAINERNAME/data will be created if necessary.'),
     '#type' => 'checkbox',
     '#return_value' => 1,
   );
 
 
   $form['webfact_fieldset_rproxy'] = array(
-    '#title' => t('Reverse proxy'),
-    '#description' => t('Settings for the proxy container responsbile for virtual name mapping.'),
+    '#title' => t('Docker API - Reverse proxy'),
+    '#description' => t('Docker API: Settings for the proxy container responsbile for virtual name mapping.'),
+    '#type' => 'fieldset',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_rproxy'] = array(
+    '#title' => t('Docker Reverse proxy'),
+    '#description' => t('Docker API: Settings for the proxy container responsbile for virtual name mapping.'),
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
@@ -239,14 +288,14 @@ function webfact_admin_settings() {
   );
   $form['webfact_fieldset_db']['webfact_manage_db_host'] = array(
     '#title' => t('Hostname or IP of the DB server'),
-    '#default_value' => variable_get('webfact_manage_db_host', array('')),
+    '#default_value' => variable_get('webfact_manage_db_host', array('mysql')),
     '#type' => 'textfield',
     '#size' => 30,
     '#maxlength' => 100,
   );
   $form['webfact_fieldset_db']['webfact_manage_db_user'] = array(
     '#title' => t('Sql username'),
-    '#default_value' => variable_get('webfact_manage_db_user', array('')),
+    '#default_value' => variable_get('webfact_manage_db_user', array('webfact_create')),
     '#description' => t('This user must have the right to create DBs'),
     '#type' => 'textfield',
     '#size' => 30,

@@ -293,16 +293,14 @@ END;
           $tlink="<li><a href=/node/$tid/edit$des>Edit template</a></li> ";
         }
       }
-      $nav2 = <<<END
+      if ($this->container_api == 0) {  // docker API
+        $nav2 = <<<END
             <ul class="nav navbar-nav navbar-right">
               <li class="dropdown">
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Docker Admin<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
-                  <li><a href="$wpath/version/$this->nid">Docker version</a></li>
                   <li><a href="$wpath/containers/$this->nid">Containers</a></li>
                   <li><a href="$wpath/images/$this->nid">Images</a></li>
-                  <li class="divider"></li>
-                  <li><a href="$wpath/mesos/$this->nid">Mesos</a></li>
                   <li class="divider"></li>
                   $tlink
                   <li><a href="$wpath/processes/$this->nid">Container processes</a></li>
@@ -319,6 +317,19 @@ END;
               </li>
             </ul>
 END;
+        } else {    // mesos
+          $nav2 = <<<END
+            <ul class="nav navbar-nav navbar-right">
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Docker Admin<span class="caret"></span></a>
+                <ul class="dropdown-menu" role="menu">
+                  <li><a href="$wpath/version/$this->nid">Marathon version</a></li>
+                  <li><a href="$wpath/mesos/$this->nid">Mesos</a></li>
+                </ul>
+              </li>
+            </ul>
+END;
+        }
       } else {
         $nav2='';
       }
@@ -332,7 +343,6 @@ END;
 
 
 
-// XX
   protected function getContainerDockerStatus() {
     if ($this->container_api == 0) {  // docker API
       // get container and status
@@ -361,7 +371,6 @@ END;
         }
       }
 
-// XX
     } else if ($this->container_api == 1) {
       try {
         $runstatus='mesos';
@@ -394,12 +403,12 @@ END;
           #throw($e);    // abort  downstream
         }
       }
-
     } else {
       $runstatus='api-unknown';
     }
     return $runstatus;
   }
+
 
   /*
    * delete a container: mesos by nid, docker by name	
@@ -1180,10 +1189,11 @@ END;
   protected function imageAction($verbose=1) {
     //watchdog('webfact', "imageAction() $this->action");
     try {
-      $manager = $this->docker->getImageManager();
+      if ($this->container_api==0) {
+        $manager = $this->docker->getImageManager();
+      }
 
       if ($this->action=='images') {
-        #$imagemgt = $this->docker->getImageManager();   // todo
         $response = $this->client->get(["/images/json?all=0",[]]);
         $this->markup = "<pre>Docker Images:\n" ;
           $procarray    = $response->json();
@@ -1206,15 +1216,20 @@ END;
       }
 
       else if ($this->action=='version') {
-// XX: todo not working yet, needs a container_api
-//dpm('version, node=' . $this->nid . ', api=' . $this->container_api);
         if ($this->container_api == 1) {
           $mesos = new Mesos($this->nid);
-          $this->markup = '<pre>' . var_export($mesos->getVersion()) .'</pre>';
-          break;
+          $version = $mesos->getVersion();
+          $this->markup = '<pre>';
+          $this->markup .= $version['name'] .' ' . $version['version'] .'<br>';
+          $this->markup .= 'leader ' . $version['leader'] .'<br>';
+          $this->markup .= print_r($version['marathon_config'], true);
+          $this->markup .= 'zookeeper_config:<br>';
+          $this->markup .= print_r($version['zookeeper_config'], true);
+          $this->markup .= '</pre>';
+        } else  {
+          $response = $this->client->get(["/version",[]]);
+          #$this->markup = '<pre>' . $response->getBody() .'</pre>';
         }
-        $response = $this->client->get(["/version",[]]);
-        $this->markup = '<pre>' . $response->getBody() .'</pre>';
       }
 
     } catch (Exception $e) {
@@ -1539,19 +1554,26 @@ END;
       }
 
       else if ($this->action=='mesos') {
-        $this->markup = "<pre>Mesos server :\n" ;
+        $this->markup = "<h3>Mesos server</h3>" ;
         $mesos = new Mesos($this->nid);
-        $this->markup .= "\n\n----- Apps\t\t\n";
-        $this->markup .= var_export($mesos->getApps(), true);
-        $this->markup .= "\n\n\n----- Tasks\n";
-        $this->markup .= var_export($mesos->getTasks(), true);
-        $this->markup .= "\n\n\n----- Groups\n";
-        $this->markup .= var_export($mesos->getGroups(), true);
-        $this->markup .= "\n\n\n----- Deployments\n";
+        $this->markup .= "<h4>Deployments</h4>";
+        $this->markup .= "<pre>" ;
         $this->markup .= var_export($mesos->getDeployments(), true);
-        $this->markup .= "\n\n\n----- Version\n";
-        $this->markup .= var_export($mesos->getVersion(), true);
         $this->markup .= "</pre>" ;
+        $this->markup .= "<h4>Tasks</h4>";
+        $this->markup .= "<pre>" ;
+        $this->markup .= var_export($mesos->getTasks(), true);
+        $this->markup .= "</pre>" ;
+        $this->markup .= "<h4>Apps</h4>";
+        $this->markup .= "<pre>" ;
+        $this->markup .= var_export($mesos->getApps(), true);
+        $this->markup .= "</pre>" ;
+        $this->markup .= "<h4>Groups</h4>";
+        $this->markup .= "<pre>" ;
+        $this->markup .= var_export($mesos->getGroups(), true);
+        $this->markup .= "</pre>" ;
+        #$this->markup .= "\n\n\n----- Version\n";
+        #$this->markup .= var_export($mesos->getVersion(), true);
         return;
       }
 
@@ -1730,7 +1752,6 @@ END;
       }
 
       else if ($this->action=='start') {
-// XX
         if ($this->container_api == 1) { // mesos 
           $mesos = new Mesos($this->nid);
           $result = $mesos->startApp(); 

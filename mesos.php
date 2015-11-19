@@ -55,8 +55,7 @@ class Mesos
 
       #watchdog('webfact', 'mesos: connect to ' . $this->mserver . ' for ' . $this->marathon_name);
 
-      // todo: drupal setting, or per template or webiste?
-      $this->url_postfix='.mesos-dev.vptt.ch';
+      $this->url_postfix='.' . variable_get('webfact_', 'mywildcard.example.ch'); 
       $this->serverdir = variable_get('webfact_server_sitesdir_host', '/opt/sites/');
     }
 

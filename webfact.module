@@ -126,14 +126,6 @@ function webfact_admin_settings() {
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
-  $form['webfact_fieldset_server']['webfact_fserver'] = array(
-    '#title' => t('Domain postfix'),
-    '#default_value' => variable_get('webfact_fserver', array('')),
-    '#description' => t('The part of the URL after the hostname, e.g. webfact.example.ch'),
-    '#type' => 'textfield',
-    '#size' => 30,
-    '#maxlength' => 100,
-  );
   $form['webfact_fieldset_server']['webfact_loglines'] = array(
     '#title' => t('How many lines to tail on logs'),
     '#default_value' => variable_get('webfact_loglines', array('')),
@@ -167,6 +159,14 @@ function webfact_admin_settings() {
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
+  );
+  $form['webfact_fieldset_cont']['webfact_fserver'] = array(
+    '#title' => t('Domain postfix'),
+    '#default_value' => variable_get('webfact_fserver', array('')),
+    '#description' => t('The part of the URL after the hostname, e.g. webfact.example.ch'),
+    '#type' => 'textfield',
+    '#size' => 30,
+    '#maxlength' => 100,
   );
   $form['webfact_fieldset_cont']['webfact_cont_image'] = array(
     '#title' => t('Default base image for creating containers (can be overridden in templates and websites)'),

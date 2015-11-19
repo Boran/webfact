@@ -235,7 +235,7 @@ class Mesos
         'healthChecks' => [[
             "path" => "/",
             "protocol" => "TCP",
-            "gracePeriodSeconds" => 600,
+            "gracePeriodSeconds" => 3600,
             "intervalSeconds" => 5,
             "timeoutSeconds" => 10,
             "maxConsecutiveFailures" => 3

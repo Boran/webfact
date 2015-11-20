@@ -1570,7 +1570,9 @@ END;
         $this->markup = "<h3>Mesos server</h3>" ;
         $mesos = new Mesos($this->nid);
         $mesosinfo=$mesos->getInfo();
-        $this->markup .= '<p>Mesos Leader: ' . $mesos->getLeader() . '</p>';
+        $this->markup .= 'UIs: <a target=_blank href= ' . $mesos->getLeader() . '>Marathon leader</a>, ';
+        $this->markup .= '<a target=_blank href= ' . $mesos->getBambooMaster() . '>Bamboo</a>, ';
+        $this->markup .= '<a target=_blank href= ' . $mesos->getMesosMaster() . '>Mesos</a>';   // todo: correct
 
         $this->markup .= "<h4>Deployments</h4>";
         $deps=$mesos->getDeployments();
@@ -1584,17 +1586,15 @@ END;
 
 // XX
         $this->markup .= "<h4>Tasks</h4>";
-        #todo: find the mesos master
-        #$urlpre='<a href=http://idcdevservices:5050/#/slaves/';
-        $urlpre='<a target=_blank href=http://idcmesos-master2.corproot.net:5050/#/slaves/';
+        #todo: find the 'real' mesos master dynamically
+        $urlpre='<a target=_blank href=' . $mesos->getMesosMaster() . '#/slaves/';
         $rows=$mesos->getTasks();
         foreach ($rows['tasks'] as $row) {
           //dpm($row);
           $this->markup .= '<p>' . $row['appId'] # . ' id=' . $row['id'] 
             . ' at ' . $row['startedAt'] . ' on ' . $row['host'] 
-            # . ' (slave id=' . $row['slaveId'] .')'
             . ' ' . $urlpre . $row['slaveId'] 
-            . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '/browse>link</a>';
+            . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '/browse>mesos link</a>';
         }
         #$this->markup .= "<pre>" ;
         #$this->markup .= var_export($mesos->getTasks(), true);
@@ -1607,7 +1607,7 @@ END;
           $this->markup .= '<p>' . $row['id']  . ' instances=' . $row['instances']  
             . ' tasksRunning=' . $row['tasksRunning']
             . ' at ' . $row['version'] 
-            . ' <a target=_blank href=http://idcdevservices.corproot.net:8080/ui/#/apps' . $row['id'] . '>link</a>';
+            . ' <a target=_blank href=' . $mesos->getLeader() . 'ui/#/apps' . $row['id'] . '>marathon link</a>';
           ;
         }
         #$this->markup .= "<pre>" ;

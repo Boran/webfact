@@ -10,7 +10,7 @@ use GuzzleHttp\Exception\RequestException;
 
 class Mesos
 {
-    private $client, $mserver, $bserver;
+    private $client, $mserver, $mserver_name, $mesosserver, $bserver;
     private $id;   // webfact id for website
     private $website, $marathon_name;
     private $url_postfix;   // Domain part of URL for reverse proxy
@@ -29,7 +29,8 @@ class Mesos
       $url = $this->mserver . 'v2/leader';
       $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
       if ($res->getStatusCode()==200) {
-        $this->mserver = 'http://' . $res->json()['leader'] . '/';  // update target
+        $this->mserver_name =  $res->json()['leader'];  // update 
+        $this->mserver = 'http://' . $res->json()['leader']  . '/';  // update target
       }
       #watchdog('webfact', 'mesos: leader is ' . $this->mserver);
       
@@ -58,10 +59,14 @@ class Mesos
 
       $this->url_postfix='.' . variable_get('webfact_fserver','mywildcard.example.ch'); 
       $this->serverdir = variable_get('webfact_server_sitesdir_host', '/opt/sites/');
+      $this->mesosserver = variable_get('webfact_mesosserver', '');
     }
 
 
     /******** bambo ******/
+    public function getBambooMaster() {
+      return $this->bserver;
+    }
     /* 
      * delete bamboo config: i.e. haproxy for mapping urls to app
      */
@@ -357,6 +362,11 @@ class Mesos
       }*/
       return $result;
     }
+    public function getMesosMaster() {
+      return $this->mesosserver;
+    }
+
+
 
     public function getInfo() {
       $result = $this->mserver;

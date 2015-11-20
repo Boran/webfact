@@ -105,7 +105,7 @@ function webfact_admin_settings() {
   $form['webfact_fieldset_serverapi']['webfact_mserver'] = array(
     '#title' => t('Mesos/Marathon API URL'),
     '#default_value' => variable_get('webfact_mserver', array('')),
-    '#description' => t('e.g. http://mesos.example.ch:8080. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
+    '#description' => t('e.g. http://marathon.example.ch:8080. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
     '#size' => 40,
     '#maxlength' => 100,
@@ -114,6 +114,14 @@ function webfact_admin_settings() {
     '#title' => t('Mesos/Bamboo API URL'),
     '#default_value' => variable_get('webfact_bserver', array('')),
     '#description' => t('e.g. http://bamboo.example.ch:8000. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
+    '#type' => 'textfield',
+    '#size' => 40,
+    '#maxlength' => 100,
+  );
+  $form['webfact_fieldset_serverapi']['webfact_mesosserver'] = array(
+    '#title' => t('Mesos/Mesos URL'),
+    '#default_value' => variable_get('webfact_mesosserver', array('')),
+    '#description' => t('e.g. http://mesos.example.ch:5050. Used to provide links to job outputs. Leave empty if mesos is not used to manage containers. Note: ensure a trailing slash.'),
     '#type' => 'textfield',
     '#size' => 40,
     '#maxlength' => 100,

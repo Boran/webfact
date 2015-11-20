@@ -15,6 +15,7 @@ class Mesos
     private $website, $marathon_name;
     private $url_postfix;   // Domain part of URL for reverse proxy
     private $serverdir;
+    private $frameworkId;
 
     public function __construct($nid)
     {
@@ -58,6 +59,7 @@ class Mesos
       $this->url_postfix='.' . variable_get('webfact_fserver','mywildcard.example.ch'); 
       $this->serverdir = variable_get('webfact_server_sitesdir_host', '/opt/sites/');
     }
+
 
     /******** bambo ******/
     /* 
@@ -348,20 +350,22 @@ class Mesos
 
     public function getLeader() {
       $result = $this->mserver;
-      $url = $this->mserver . 'v2/leader';
+      /*$url = $this->mserver . 'v2/leader';
       $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
       if ($res->getStatusCode()==200) {
         $result = $res->json()['leader'];
-      }
+      }*/
       return $result;
     }
 
-    public function getVersion() {
+    public function getInfo() {
       $result = $this->mserver;
+      $this->frameworkId='';
       $url = $this->mserver . 'v2/info';
       $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
       if ($res->getStatusCode()==200) {
         $result = $res->json();
+        $this->frameworkId=$result['frameworkId'];
       }
       return $result;
     }

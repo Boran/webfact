@@ -594,7 +594,17 @@ END;
   protected function renameContainer($old, $newname, $verbose) {
      watchdog('webfact', "renameContainer $old to $newname" . ' by ' . $this->user);
      if ($this->container_api == 1) { // mesos 
-       //
+       // dont rename the container, just change the URL that bamboo uses.
+
+       #  rename metadata
+       $this->website->field_hostname['und'][0]['value'] = $newname;
+       node_save($this->website);     // Save the updated node
+       $this->website=node_load($this->website->nid);  # reload cache
+       $mesos = new Mesos($this->website->nid);
+       $mesos->updateBamboo();
+       if ($verbose==1) {
+         $this->message("Renamed meta data hostname from $old to $newname and reconfigure bamboo");
+       }
 
      } else {
 
@@ -1220,7 +1230,8 @@ END;
       else if ($this->action=='version') {
         if ($this->container_api == 1) {
           $mesos = new Mesos($this->nid);
-          $version = $mesos->getVersion();
+          $version = $mesos->getInfo();
+          #dpm($version);
           $this->markup = '<pre>';
           $this->markup .= $version['name'] .' ' . $version['version'] .'<br>';
           $this->markup .= 'leader ' . $version['leader'] .'<br>';
@@ -1558,22 +1569,57 @@ END;
       else if ($this->action=='mesos') {
         $this->markup = "<h3>Mesos server</h3>" ;
         $mesos = new Mesos($this->nid);
+        $mesosinfo=$mesos->getInfo();
+        $this->markup .= '<p>Mesos Leader: ' . $mesos->getLeader() . '</p>';
+
         $this->markup .= "<h4>Deployments</h4>";
-        $this->markup .= "<pre>" ;
-        $this->markup .= var_export($mesos->getDeployments(), true);
-        $this->markup .= "</pre>" ;
+        $deps=$mesos->getDeployments();
+        foreach ($deps as $row) {
+          $this->markup .= '<p>' . $row['affectedApps'][0] . ' ' . $row['id'] . ' ' . $row['version'] . '</p>';
+          #dpm($row);
+        }
+        #$this->markup .= "<pre>" ;
+        #$this->markup .= var_export($deps, true);
+        #$this->markup .= "</pre>" ;
+
+// XX
         $this->markup .= "<h4>Tasks</h4>";
-        $this->markup .= "<pre>" ;
-        $this->markup .= var_export($mesos->getTasks(), true);
-        $this->markup .= "</pre>" ;
+        #todo: find the mesos master
+        #$urlpre='<a href=http://idcdevservices:5050/#/slaves/';
+        $urlpre='<a target=_blank href=http://idcmesos-master2.corproot.net:5050/#/slaves/';
+        $rows=$mesos->getTasks();
+        foreach ($rows['tasks'] as $row) {
+          //dpm($row);
+          $this->markup .= '<p>' . $row['appId'] # . ' id=' . $row['id'] 
+            . ' at ' . $row['startedAt'] . ' on ' . $row['host'] 
+            # . ' (slave id=' . $row['slaveId'] .')'
+            . ' ' . $urlpre . $row['slaveId'] 
+            . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '/browse>link</a>';
+        }
+        #$this->markup .= "<pre>" ;
+        #$this->markup .= var_export($mesos->getTasks(), true);
+        #$this->markup .= "</pre>" ;
+
         $this->markup .= "<h4>Apps</h4>";
-        $this->markup .= "<pre>" ;
-        $this->markup .= var_export($mesos->getApps(), true);
-        $this->markup .= "</pre>" ;
-        $this->markup .= "<h4>Groups</h4>";
-        $this->markup .= "<pre>" ;
-        $this->markup .= var_export($mesos->getGroups(), true);
-        $this->markup .= "</pre>" ;
+        $rows=$mesos->getApps();
+        foreach ($rows['apps'] as $row) {
+          #dpm($row);
+          $this->markup .= '<p>' . $row['id']  . ' instances=' . $row['instances']  
+            . ' tasksRunning=' . $row['tasksRunning']
+            . ' at ' . $row['version'] 
+            . ' <a target=_blank href=http://idcdevservices.corproot.net:8080/ui/#/apps' . $row['id'] . '>link</a>';
+          ;
+        }
+        #$this->markup .= "<pre>" ;
+        #$this->markup .= var_export($mesos->getApps(), true);
+        #$this->markup .= "</pre>" ;
+
+        #$this->markup .= "<h4>Groups</h4>";
+        #$rows=$mesos->getGroups();
+        #dpm($rows);
+        #$this->markup .= "<pre>" ;
+        #$this->markup .= var_export($mesos->getGroups(), true);
+        #$this->markup .= "</pre>" ;
         #$this->markup .= "\n\n\n----- Version\n";
         #$this->markup .= var_export($mesos->getVersion(), true);
         return;
@@ -1598,7 +1644,6 @@ END;
       }
 
       else if ($this->action=='inspect') {
-// XX
         if ($this->container_api == 1) {  // mesos
           $this->markup = 'Mesos information:<br><pre>';
           try {

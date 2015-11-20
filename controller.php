@@ -374,7 +374,7 @@ END;
     } else if ($this->container_api == 1) {
       try {
         $runstatus='mesos';
-        $mesos = new Mesos($this->nid);
+        $mesos = new Mesos($this->website->nid);
         $runstatus .= ' ' . $mesos->getStatus();
 
       } catch (RequestException $e) {
@@ -1152,15 +1152,17 @@ END;
 
     $runstatus=$this->getContainerDockerStatus();
 
-    // grab some more key run info
-    #dpm($cont);
-    $this->actual_restart='';
-    if (isset($cont['HostConfig']['RestartPolicy'])) {
-      $this->actual_restart= $cont['HostConfig']['RestartPolicy']['Name'];
-    }
-    $this->actual_error='none';
-    if (isset($cont['State']['Error']) && !empty($cont['State']['Error'])) {
-      $this->actual_error= $cont['State']['Error'];
+    if ($this->container_api==0) {
+      // grab some more key run info
+      #dpm($cont);
+      $this->actual_restart='';
+      if (isset($cont['HostConfig']['RestartPolicy'])) {
+        $this->actual_restart= $cont['HostConfig']['RestartPolicy']['Name'];
+      }
+      $this->actual_error='none';
+      if (isset($cont['State']['Error']) && !empty($cont['State']['Error'])) {
+        $this->actual_error= $cont['State']['Error'];
+      }
     }
     return $runstatus;
   }

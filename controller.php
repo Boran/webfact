@@ -420,8 +420,9 @@ END;
   public function deleteContainer($nid, $name, $verbose=0) {
     $result='';
     if ($this->container_api == 1) { // mesos 
+      watchdog('webfact', "deleteContainer mesos nid=$nid");
       #$this->message("Mesos: deleting ..");
-      $mesos = new Mesos($this->nid);
+      $mesos = new Mesos($nid);
       $result = $mesos->deleteApp($verbose);  //deploymentId version
       if ($verbose > 1) {  // UI message
         if (isset($result[0])) {
@@ -566,7 +567,26 @@ END;
   /*
    * rebuild: stop, delete, create
    */
-  protected function rebuildContainer ($name, $verbose=0) {
+  protected function rebuildContainer($name, $verbose=0) {
+     if ($this->container_api == 1) { // mesos  stop and start
+       if (is_numeric($this->website->nid) ) {
+         $mesos = new Mesos($this->website->nid);
+         $result = implode(', ', $mesos->stopApp());
+         sleep(1); // needed?
+         $result .= '. Start=' . implode(', ', $mesos->startApp());
+         if ($verbose==1) {
+           $this->message('Mesos containerd stopped and started.');
+           $this->message($result);
+         }
+       }  else {
+         $result = "error: no nid";
+         if ($verbose==1) {
+           $this->message('Mesos container restart. ' . $result);
+         }
+       } 
+       return $result;
+     } 
+
      $manager = $this->getContainerManager();
      $container = $manager->find($name);
      if (!$container) {
@@ -607,62 +627,60 @@ END;
        }
 
      } else {
+       // else docker API
+       $olddir = $this->sitesdir . $old;
+       $newdir = $this->sitesdir . $newname;
+       $manager = $this->getContainerManager();
 
-     // else docker API
-     $olddir = $this->sitesdir . $old;
-     $newdir = $this->sitesdir . $newname;
-     $manager = $this->getContainerManager();
-
-     // check for name conflict, i.e. newname does not already exist
-     $container = $manager->find($newname);
-     if ($container) {
-       throw new Exception("renameContainer: $newname already exists.");
-     }
-     if ( file_exists($newdir) ) {
-       throw new Exception("renameContainer: A server folder $newdir already exists");
-     }
-
-     // get the current container and stop it
-     $container = $manager->find($old);
-     if (!$container) {
-       watchdog('webfact', "renameContainer $old - no such container");
-       if ($verbose==1) {
-          $this->message("$old does not exist");
+       // check for name conflict, i.e. newname does not already exist
+       $container = $manager->find($newname);
+       if ($container) {
+         throw new Exception("renameContainer: $newname already exists.");
        }
-       throw new Exception("renameContainer $old - no such container");
-     }
-     if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
-       $manager->stop($container);
-     }
+       if ( file_exists($newdir) ) {
+         throw new Exception("renameContainer: A server folder $newdir already exists");
+       }
 
-     # a) Rename server folder
-     if ( file_exists($olddir) && is_writable($olddir) ) {
-       if ( rename($olddir, $newdir) ) {
-         watchdog('webfact', "renameContainer $olddir renamed to $newdir");
+       // get the current container and stop it
+       $container = $manager->find($old);
+       if (!$container) {
+         watchdog('webfact', "renameContainer $old - no such container");
+         if ($verbose==1) {
+            $this->message("$old does not exist");
+         }
+         throw new Exception("renameContainer $old - no such container");
+       }
+       if  ($container->getRuntimeInformations()['State']['Running'] == TRUE) {
+         $manager->stop($container);
+       }
+
+       # a) Rename server folder
+       if ( file_exists($olddir) && is_writable($olddir) ) {
+         if ( rename($olddir, $newdir) ) {
+           watchdog('webfact', "renameContainer $olddir renamed to $newdir");
+         } else {
+           throw new Exception("renameContainer: error $olddir to $newdir");
+         }
        } else {
-         throw new Exception("renameContainer: error $olddir to $newdir");
+         if ( ! file_exists($olddir) ) {
+           throw new Exception("renameContainer $olddir does not exist");
+         }
+         if ( ! is_writable($olddir) ) {
+           throw new Exception("renameContainer $olddir not writeable");
+         }
        }
-     } else {
-       if ( ! file_exists($olddir) ) {
-         throw new Exception("renameContainer $olddir does not exist");
+       if ($verbose==1) {
+         $this->message("Renamed server folder $olddir to $newdir");
        }
-       if ( ! is_writable($olddir) ) {
-         throw new Exception("renameContainer $olddir not writeable");
-       }
-     }
-     if ($verbose==1) {
-       $this->message("Renamed server folder $olddir to $newdir");
-     }
-
-     # Rename database+user, metadata:  
-     # 7.10.2015: disabled since the drupal settings.php would also need to be adapted
-     # so the db/user will always have the "old" name, but can be found in the docker and meta env.
-     #$this->extdb('rename', 1, $newname); 
-
-     # b) rename container
-     $manager->rename($container, $newname);
-
+       # Rename database+user, metadata:  
+       # 7.10.2015: disabled since the drupal settings.php would also need to be adapted
+       # so the db/user will always have the "old" name, but can be found in the docker and meta env.
+       #$this->extdb('rename', 1, $newname); 
+  
+       # b) rename container
+       $manager->rename($container, $newname);
      }  // if docker
+
 
      # c) rename metadata
      $this->website->field_hostname['und'][0]['value'] = $newname;
@@ -681,7 +699,11 @@ END;
      #$this->rebuildContainer($newname, $verbose);  
 
      if ($verbose==1) {
-       $this->message('done. Rebuild may still be needed.');
+       if ($this->container_api == 1) { // mesos 
+         $this->message('done.');
+       } else { 
+         $this->message('done. Rebuild may still be needed.');
+       }
      }
   }
 
@@ -846,7 +868,7 @@ END;
     }
     if ($this->is_drupal == 1) { 
       // Create a volume mount point automatically?
-      if (! file_exists($this->sitesdir . $this->id) ) {
+      if (($this->container_api==0) && ! file_exists($this->sitesdir . $this->id) ) {
         if ((variable_get('webfact_data_volume', 1) == 1 ) || (variable_get('webfact_www_volume', 1) == 1 ) ) {
       
           if (! mkdir($this->sitesdir . $this->id, 0775) ) {
@@ -859,7 +881,7 @@ END;
         $folder = $this->sitesdir_host . $this->id . $mount;
         $this->docker_vol[$mount] = array() ; 
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
-        if (! file_exists($folder) ) {
+        if (($this->container_api==0) && ! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
           if (! mkdir($folder, 0775) ) {
             watchdog('webfact', 'Server folder ' . $folder .' could not be created, is the parent folder writeable?');
@@ -1079,8 +1101,8 @@ END;
    *  max number of bytes to read from the result
    */
   public function runCommand($cmd, $id='', $maxlength=8192, $verbose=0) {
-    if ($this->container_api == 1) {  // mesos
-      return(''); // not available for mesos
+    if ($this->container_api==1) { // mesos
+      return(-2);  // todo: XX
     }
     if (strlen($id)<1) {
       $id = $this->id;
@@ -1125,6 +1147,9 @@ END;
    * get the build status number created by start.sh in the boran/drupal image, if available
    */
   public function getContainerBuildStatus() {
+    if ($this->container_api==1) { // mesos
+      return(-1);  // todo: XX
+    }
     $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
     $this->actual_buildstatus = $this->runCommand($cmd);
     return($this->actual_buildstatus);
@@ -1134,6 +1159,9 @@ END;
    * get the status within the container, from webfact_status.sh
    */
   public function getContainerStatus() {
+    if ($this->container_api==1) { // mesos
+      return(-1);  // todo: XX
+    }
     // todo: make the command a parameter?
     $webroot = variable_get('webfact_www_volume_path', '/var/www/html');
     $cmd = "if [[ -d $webroot ]] && [[ -x $webroot/webfact_status.sh ]] ; then $webroot/webfact_status.sh; fi;";
@@ -1584,7 +1612,6 @@ END;
         #$this->markup .= var_export($deps, true);
         #$this->markup .= "</pre>" ;
 
-// XX
         $this->markup .= "<h4>Tasks</h4>";
         #todo: find the 'real' mesos master dynamically
         $urlpre='<a target=_blank href=' . $mesos->getMesosMaster() . '#/slaves/';
@@ -1834,6 +1861,11 @@ END;
        * assume that data is persistent on volumes.
        */
       else if ($this->action=='rebuild2') {
+        if ($this->container_api == 1) {
+          $this->message("Mesos $this->action not available ", 'warning');
+          return;
+        }
+
         global $base_root;
         $this->touch_node_date();
         $this->client->setDefaultOption('timeout', 60);   // backups can take time
@@ -2034,6 +2066,12 @@ END;
 
       else if ($this->action=='rebuild') {
         global $base_root;
+        if ($this->container_api == 1) { // mesos 
+          $this->rebuildContainer('notused', 1); 
+          drupal_goto("/website/advanced/$this->nid"); // show new status
+          return;
+        }
+
         // Stop accidental deleting of key containers
         if (stristr($this->category, 'production')) {
           $this->message("$this->id is categorised as production, rebuild/delete not allowed.", 'error');
@@ -2046,7 +2084,6 @@ END;
             return;
           }
         }
-
         // Rebuilding via batch API
         watchdog('webfact', "rebuild batch- delete, rebuild ", WATCHDOG_NOTICE);
         $this->touch_node_date();
@@ -2893,10 +2930,6 @@ END;
 
 
       case 'corename':     // Rename a container
-        if ($this->container_api == 1) {
-          $this->message("Mesos $this->action not available ", 'warning');
-          break;
-        }
         $html = <<<END
 <!-- Bootstrap: -->
 <form >

@@ -6,6 +6,8 @@ use GuzzleHttp\Exception\RequestException;
 /**
  * Abstract Marathon and Bamboo API for management
  * of containers with Mesos
+ *
+ * Tip: verify/debug json: http://jsonlint.com/ http://jsonviewer.stack.hu/
  */
 
 class Mesos
@@ -249,18 +251,7 @@ class Mesos
         ]],
         'container' => [ 
           'type' => 'DOCKER',
-          'volumes' => [
-             [
-                 'containerPath' => '/data',
-                 'hostPath'      => $this->serverdir . "$this->marathon_name/data",
-                 'mode'          => 'RW'
-             ],
-             [
-                 'containerPath' => '/var/www/html',
-                 'hostPath'      => $this->serverdir . "$this->marathon_name/www",
-                 'mode'          => 'RW'
-             ]
-          ],
+          'volumes' => $cont['vol'],
           'docker' => [ 
             'image' => $cont['image'],
             'network' => 'BRIDGE',
@@ -297,7 +288,7 @@ class Mesos
             if ($e->getResponse()->getStatusCode()==409) {
               drupal_set_message( $e->getResponse()->json()['message']  );
             } else {
-              dupal_set_message( $e->getResponse()->getStatusCode()
+              drupal_set_message( $e->getResponse()->getStatusCode()
                 . ', ' . $e->getResponse()->getReasonPhrase() 
                 . ': ' . $e->getResponse()->json()['message']  );
               #dpm( var_export( $e->getResponse(), true) );

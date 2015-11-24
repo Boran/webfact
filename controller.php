@@ -744,6 +744,12 @@ END;
     }
     $this->extdb('create', $verbose);  // if an an external DB is needed
 
+    if (strlen($this->cont_image)<1) {
+       if ($verbose == 1) {
+         $this->message("create $this->id : no docker image specified", 'error', 3);
+       }
+      return("no image specififed");
+    }
     // create the container
     if ($this->container_api == 1) { // mesos 
       $cont=Array();  // container spec for mesos
@@ -751,9 +757,8 @@ END;
         $cont['mem']=$this->cont_mem;
       }
       $cont['image']=$this->cont_image;
-      $cont['cmd']='/start.sh';
+      $cont['cmd']='/start.sh';   // todo: parameter
       $cont['port']=443;   // todo: parameter
-      $cont['vol']=$this->docker_vol;
       $cont['ports']=$this->docker_ports;
       $cont['url']=$this->fqdn;
       // Reformat $this->docker_env from key=value to key=>value for mesos
@@ -762,6 +767,20 @@ END;
           $cont['env'][$matches[1]] = $matches[2];
         }
       }
+      // Reformat $this->docker_vol from key=value to array for mesos
+      //dpm($this->docker_start_vol);
+      $i=0;
+      foreach ($this->docker_start_vol as $row) {
+        if ( preg_match("/\s*(.+):(.+):(.+)\s*/", $row, $matches) ) {
+          #dpm($matches[1] .', '  . $matches[2] . ', '  . $matches[3]);
+          #$cont['env'][$matches[1]] = $matches[2];
+          $cont['vol'][$i]['containerPath']=$matches[2];
+          $cont['vol'][$i]['hostPath']=$matches[1];
+          $cont['vol'][$i]['mode']=strtoupper($matches[3]);
+          $i++;
+        }
+      }
+      dpm($cont);
       $mesos = new Mesos($this->nid);
       $result = $mesos->createApp($cont, 1);
       if ($this->verbose===1) {
@@ -846,7 +865,6 @@ END;
     // Initial docker environment variables
 
     $this->fqdn = $this->id . '.' . $this->fserver;  // e.g. MYHOST.webfact.example.ch
-    //todo mesos: override with marathon_name
 
     if ($this->is_drupal == 1) {
       $this->docker_env = [
@@ -1634,7 +1652,7 @@ END;
           $this->markup .= '<p>' . $row['id']  . ' instances=' . $row['instances']  
             . ' tasksRunning=' . $row['tasksRunning']
             . ' at ' . $row['version'] 
-            . ' <a target=_blank href=' . $mesos->getLeader() . 'ui/#/apps' . $row['id'] . '>marathon link</a>';
+            . ' <a target=_blank href=' . $mesos->getLeader() . 'ui/#/apps/' . urlencode($row['id']) . '>marathon link</a>';
           ;
         }
         #$this->markup .= "<pre>" ;

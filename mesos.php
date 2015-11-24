@@ -143,13 +143,13 @@ class Mesos
         #echo $e->getRequest();
         if ($e->hasResponse()) {
           if ($e->getResponse()->getStatusCode()==409) { // conflict
-            dpm( $e->getResponse()->json()['message']  );
+            drupal_set_message( $e->getResponse()->json()['message']  );
           } else {
-            dpm( 'stopApp ' . $e->getResponse()->getStatusCode()
+            drupal_set_message( 'stopApp ' . $e->getResponse()->getStatusCode()
               . ', ' . $e->getResponse()->getReasonPhrase()
               . ': ' . $e->getResponse()->json()['message']  );
             #dpm( var_export( $e->getResponse(), true) );
-            dpm(  $e->__toString() );
+            drupal_set_message(  $e->__toString() );
           }
           throw($e);    // abort  downstream
         }

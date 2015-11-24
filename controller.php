@@ -1166,7 +1166,7 @@ END;
    */
   public function getContainerBuildStatus() {
     if ($this->container_api==1) { // mesos
-      return(-1);  // todo: XX
+      return(200);  // todo: XX
     }
     $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
     $this->actual_buildstatus = $this->runCommand($cmd);
@@ -1178,7 +1178,7 @@ END;
    */
   public function getContainerStatus() {
     if ($this->container_api==1) { // mesos
-      return(-1);  // todo: XX
+      return(200);  // todo: XX
     }
     // todo: make the command a parameter?
     $webroot = variable_get('webfact_www_volume_path', '/var/www/html');

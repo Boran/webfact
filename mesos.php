@@ -365,11 +365,11 @@ class Mesos
         # extract IP:port from master@10.98.181.45:5050
         $res=  preg_match('/^.*\@(.*:\d+)$/', $res->json()['leader'], $matches); 
         #dpm($matches[1]);
-        $result=$matches[1];
+        $result='http://' . $matches[1] .'/';   // todo: use same http/s as original
       }
       #watchdog('webfact', 'mesos: mesos leader is ' . $this->mesosserver);
       $this->mesosserver = $result;
-      return 'http://' . $result;   // todo: use same http/s as original
+      return $result;
     }
 
 

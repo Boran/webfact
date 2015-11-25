@@ -1641,7 +1641,8 @@ END;
           $this->markup .= '<p>' . $row['appId'] # . ' id=' . $row['id'] 
             . ' at ' . $row['startedAt'] . ' on ' . $row['host'] 
             . ' ' . $urlpre . $row['slaveId'] 
-            . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '/browse>mesos link</a>';
+            #. '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '/browse>mesos link</a>';
+            . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '>mesos link</a>';
         }
         #$this->markup .= "<pre>" ;
         #$this->markup .= var_export($mesos->getTasks(), true);

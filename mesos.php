@@ -27,14 +27,14 @@ class Mesos
       // todo: create the initial request object with URL/proxy etc.
       // exception if empty
 
-      // who is current leader in the cluster?
+      // who is current marathon leader in the cluster?
       $url = $this->mserver . 'v2/leader';
       $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
       if ($res->getStatusCode()==200) {
         $this->mserver_name =  $res->json()['leader'];  // update 
         $this->mserver = 'http://' . $res->json()['leader']  . '/';  // update target
       }
-      #watchdog('webfact', 'mesos: leader is ' . $this->mserver);
+      #watchdog('webfact', 'mesos: marathon leader is ' . $this->mserver);
       
       // get the webfact meta data for the website, specifically the container name
       // load website node if needed
@@ -344,6 +344,7 @@ class Mesos
       return $result;
     }
 
+    /* get marathon leader */
     public function getLeader() {
       $result = $this->mserver;
       /*$url = $this->mserver . 'v2/leader';
@@ -353,8 +354,22 @@ class Mesos
       }*/
       return $result;
     }
+    /* get mesos master leader */
     public function getMesosMaster() {
-      return $this->mesosserver;
+      $result=$this->mesosserver;
+      #return $this->mesosserver;
+      // who is current marathon leader in the cluster?
+      $url = $this->mesosserver . 'master/state.json';
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        # extract IP:port from master@10.98.181.45:5050
+        $res=  preg_match('/^.*\@(.*:\d+)$/', $res->json()['leader'], $matches); 
+        #dpm($matches[1]);
+        $result=$matches[1];
+      }
+      #watchdog('webfact', 'mesos: mesos leader is ' . $this->mesosserver);
+      $this->mesosserver = $result;
+      return 'http://' . $result;   // todo: use same http/s as original
     }
 
 

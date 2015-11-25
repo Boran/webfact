@@ -323,6 +323,8 @@ END;
               <li class="dropdown">
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Docker Admin<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
+                  $tlink
+                  <li class="divider"></li>
                   <li><a href="$wpath/version/$this->nid">Marathon version</a></li>
                   <li><a href="$wpath/mesos/$this->nid">Mesos</a></li>
                 </ul>
@@ -745,9 +747,9 @@ END;
     $this->extdb('create', $verbose);  // if an an external DB is needed
 
     if (strlen($this->cont_image)<1) {
-       if ($verbose == 1) {
-         $this->message("create $this->id : no docker image specified", 'error', 3);
-       }
+      if ($verbose == 1) {
+        $this->message("create $this->id : no docker image specified", 'error', 3);
+      }
       return("no image specififed");
     }
     // create the container
@@ -768,7 +770,7 @@ END;
         }
       }
       // Reformat $this->docker_vol from key=value to array for mesos
-      //dpm($this->docker_start_vol);
+      #dpm($this->docker_start_vol);
       $i=0;
       foreach ($this->docker_start_vol as $row) {
         if ( preg_match("/\s*(.+):(.+):(.+)\s*/", $row, $matches) ) {
@@ -780,7 +782,7 @@ END;
           $i++;
         }
       }
-      dpm($cont);
+      #dpm($cont);
       $mesos = new Mesos($this->nid);
       $result = $mesos->createApp($cont, 1);
       if ($this->verbose===1) {
@@ -901,7 +903,7 @@ END;
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
         if (($this->container_api==0) && ! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
-          if (! mkdir($folder, 0775) ) {
+          if (($this->container_api==0) && ! mkdir($folder, 0775) ) {
             watchdog('webfact', 'Server folder ' . $folder .' could not be created, is the parent folder writeable?');
           }
         }
@@ -913,7 +915,7 @@ END;
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
         if (! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
-          if (! mkdir($folder, 0775) ) {
+          if (($this->container_api==0) && ! mkdir($folder, 0775) ) {
             # log, but not to UI
             #drupal_set_message("Server folder $folder could not be created.", 'warning');
             watchdog('webfact', 'Server folder ' . $folder .' could not be created');
@@ -1930,14 +1932,16 @@ END;
       else if ($this->action=='rebuild3') {
         global $base_root;
         $this->touch_node_date();
-        $this->client->setDefaultOption('timeout', 60);   // backups can take time
-        if (! $container) {
-          $this->message("$this->id does not exist", 'warning');
-          return;
-        }
-        if ($this->getStatus($this->nid) != 'running' ) {
-          $this->message("The container is not running.", 'error');
-          return;
+        if ($this->container_api == 0) {
+          $this->client->setDefaultOption('timeout', 60);   // backups can take time
+          if (! $container) {
+            $this->message("$this->id does not exist", 'warning');
+            return;
+          }
+          if ($this->getStatus($this->nid) != 'running' ) {
+            $this->message("The container is not running.", 'error');
+            return;
+          }
         }
 
         // via batch API

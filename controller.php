@@ -903,7 +903,7 @@ END;
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
         if (($this->container_api==0) && ! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
-          if (($this->container_api==0) && ! mkdir($folder, 0775) ) {
+          if (! mkdir($folder, 0775) ) {
             watchdog('webfact', 'Server folder ' . $folder .' could not be created, is the parent folder writeable?');
           }
         }
@@ -913,9 +913,9 @@ END;
         $folder = $this->sitesdir_host . $this->id . '/www';
         $this->docker_vol[$mount] = array() ;
         $this->docker_start_vol[] = $folder . ':' . $mount . ':rw';
-        if (! file_exists($folder) ) {
+        if (($this->container_api==0) && ! file_exists($folder) ) {
           watchdog('webfact', "Create $folder");
-          if (($this->container_api==0) && ! mkdir($folder, 0775) ) {
+          if (! mkdir($folder, 0775) ) {
             # log, but not to UI
             #drupal_set_message("Server folder $folder could not be created.", 'warning');
             watchdog('webfact', 'Server folder ' . $folder .' could not be created');
@@ -1168,7 +1168,16 @@ END;
    */
   public function getContainerBuildStatus() {
     if ($this->container_api==1) { // mesos
-      return(200);  // todo: XX
+      $buildstatusfile = $this->sitesdir . $this->id . "/www/.start.sh.stat";
+      $cmd = "cat $buildstatusfile; if [[ -f $buildstatusfile ]] ; then tail -1 $buildstatusfile; fi";
+      watchdog('webfact', "getting build status for $this->id via $cmd");
+      $logs = exec("$cmd", $outputexec, $resultexec);
+      if ( $resultexec ) { watchdog('webfact', "cannot get build status <pre>" . print_r($outputexec, true) . $logs . "</pre> and " . $resultexec, 'error'); }
+      watchdog('webfact', "build status for $this->id is  <pre>" . print_r($outputexec, true) . " </pre>");
+      if (isset($outputexec[0])) {
+         return($outputexec[0]);
+      }
+      return(0);  // todo: XX
     }
     $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
     $this->actual_buildstatus = $this->runCommand($cmd);
@@ -1551,7 +1560,7 @@ END;
             }
           }
         }
-        $this->stopContainerByNid($this->nid);
+// XX        $this->stopContainerByNid($this->nid);
         $logs = $this->deleteContainerData($this->nid, $this->id, 1);
         $this->touch_node_date();
         $this->deleteContainerDB($this->nid, $this->id, 1);

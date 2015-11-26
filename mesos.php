@@ -104,8 +104,8 @@ class Mesos
     public function updateBamboo($verbose=0) {
       $url = $this->bserver . 'api/services/' . $this->marathon_name;
       try {
-        $data = json_encode(array('id'=>$this->marathon_name, 'acl' =>'hdr(host) -i ' . $this->id . $this->url_postfix));
-        watchdog('webfact', 'updateBamboo ' . $this->marathon_name . ' hdr(host) -i ' . $this->id . $this->url_postfix);
+        $data = json_encode(array('id'=>$this->marathon_name, 'acl' =>'hdr_beg(host) -i ' . $this->id . $this->url_postfix));
+        watchdog('webfact', 'updateBamboo ' . $this->marathon_name . ' hdr_beg(host) -i ' . $this->id . $this->url_postfix);
         $res = $this->client->put($url, [ 'auth' => ['user', 'pass'] , 'proxy' => '', 'headers' => ['Content-Type' => 'application/json'], 'body' => $data ]);
         if ($verbose > 0) {
           #dpm( var_export($res->json(), true) );

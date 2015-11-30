@@ -1169,7 +1169,7 @@ END;
   public function getContainerBuildStatus() {
     if ($this->container_api==1) { // mesos
       $buildstatusfile = $this->sitesdir . $this->id . "/www/.start.sh.stat";
-      $cmd = "cat $buildstatusfile; if [[ -f $buildstatusfile ]] ; then tail -1 $buildstatusfile; fi";
+      $cmd = "if [[ -f $buildstatusfile ]] ; then tail -1 $buildstatusfile; fi";
       watchdog('webfact', "getting build status for $this->id via $cmd");
       $logs = exec("$cmd", $outputexec, $resultexec);
       if ( $resultexec ) { watchdog('webfact', "cannot get build status <pre>" . print_r($outputexec, true) . $logs . "</pre> and " . $resultexec, 'error'); }
@@ -1232,6 +1232,16 @@ END;
       }
     }
     return $runstatus;
+  }
+
+  public function hotFixSetVisibility($script_location, $script_name, $visibility) {
+     $cmd = 'cd ' . $this->sitesdir . $this->id . '/www/' . $script_location . '; ./' . $script_name . ' ' . $visibility;
+     watchdog('webfact', "set visibility of website: " . $this->id . ", to: " . $visibility
+                          . ", with command: " . $cmd);
+     $logs = exec("$cmd 2>&1", $outputexec, $resultexec);
+  #   if ( $resultexec ) { 
+        watchdog('webfact', "set visibiliy command result <pre>" . print_r($outputexec, true) . "</pre>");
+  #    }
   }
 
 

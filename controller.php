@@ -198,10 +198,10 @@ END;
       if ($this->container_api == 0) {  // docker API
         $createui  = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
         $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
-        $docker_logs="<li><a href=$wpath/logs/$this->nid>Docker logs</a></li>";
       } else {
         $drupal_logs= $docker_logs ='';
         $createui  = "<li><a href=$wpath/create/$this->nid>Create</a></li>";
+        $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
       }
       $deletewww = "<li><a href=$wpath/deletewww/$this->nid onclick='return confirm(\"Delete persistent data from Drupal containers: Webroot and linked Database. There is no going back, are you sure?\")'>Delete Drupal data (www+DB)</a></li>";
 
@@ -235,8 +235,6 @@ END;
                   <li class="divider"></li>
                   $createui
                   <li class="divider"></li>
-                  $docker_logs
-                  $drupal_logs
                   <li><a href="$wpath/deleteui/$this->nid" onclick="return confirm('Choose if there is no persistent data within the container. Are you sure?')">Delete container</a></li>
                   $deletewww
                   <li><a href="$wpath/deleteall/$this->nid" onclick="return confirm('Delete everything associated: Container, docker image backups, linked database (if any), webroot volume contents and this meta data. Are you REALLY sure?')">Delete everything: container, data, ..</a></li>
@@ -250,6 +248,10 @@ END;
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Advanced<span class="caret"></span></a>
                 <ul class="dropdown-menu" role="menu">
                   <li><a href="$wpath/inspect/$this->nid">Inspect</a></li>
+                  <li class="divider"></li>
+                  $docker_logs
+                  $drupal_logs
+                  <li class="divider"></li>
                   <li><a href="$wpath/cocmd/$this->nid">Run command</a></li>
                   $coappupdate
                   <li class="divider"></li>
@@ -1812,8 +1814,15 @@ END;
       }
 
       else if ($this->action=='druplogs') {
-        $cmd = "cd " . $this->webroot . " && drush ws --count=" . variable_get('webfact_druplogs_count', 200);
-        $logs = $this->runCommand($cmd);
+        if ($this->container_api == 1) {
+          $cmd = "cd /opt/sites/" . $this->id . "/www && drush ws --count=" . variable_get('webfact_druplogs_count', 200);
+          $res = exec("sudo $cmd 2>&1", $logs, $resultexec);
+          #dpm($resultexec);
+
+        } else {
+          $cmd = "cd " . $this->webroot . " && drush ws --count=" . variable_get('webfact_druplogs_count', 200);
+          $logs = $this->runCommand($cmd);
+        }
         $this->markup = "<h3>Results</h3> $cmd:<pre>$logs</pre>";   // show output
         return;
       }

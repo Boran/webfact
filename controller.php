@@ -377,9 +377,9 @@ END;
 
     } else if ($this->container_api == 1) {
       try {
-        $runstatus='mesos';
+        $runstatus = 'mesos';
         $mesos = new Mesos($this->website->nid);
-        $runstatus .= ' ' . $mesos->getStatus();
+        $runstatus = $mesos->getStatus();
 
       } catch (RequestException $e) {
         # never called

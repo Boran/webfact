@@ -1171,33 +1171,44 @@ END;
   public function getContainerBuildStatus() {
     if ($this->container_api==1) { // mesos
       $buildstatusfile = $this->sitesdir . $this->id . "/www/.start.sh.stat";
-      $cmd = "if [[ -f $buildstatusfile ]] ; then tail -1 $buildstatusfile; fi";
-      watchdog('webfact', "getting build status for $this->id via $cmd");
+      $cmd = "if [ -f $buildstatusfile ] ; then tail -1 $buildstatusfile 2>&1; fi";
+      #watchdog('webfact', "getting build status for $this->id via $cmd");
       $logs = exec("$cmd", $outputexec, $resultexec);
-      if ( $resultexec ) { watchdog('webfact', "cannot get build status <pre>" . print_r($outputexec, true) . $logs . "</pre> and " . $resultexec, 'error'); }
-      watchdog('webfact', "build status for $this->id is  <pre>" . print_r($outputexec, true) . " </pre>");
-      if (isset($outputexec[0])) {
-         return($outputexec[0]);
+      if ( $resultexec ) { 
+        watchdog('webfact', "cannot get build status <pre>" . print_r($outputexec, true) . $logs . "</pre> and " . $resultexec, 'error'); 
       }
-      return(0);  // todo: XX
+      if (isset($outputexec[0])) {
+        #watchdog('webfact', "build status for $this->id is  <pre>" . print_r($outputexec, true) . " </pre>");
+        $this->actual_buildstatus = $outputexec[0];
+      } else  {
+        $this->actual_buildstatus = 0;   // todo what is the best way to indicate no build status?
+      } 
+
+    } else  {
+      $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
+      $this->actual_buildstatus = $this->runCommand($cmd);
     }
-    $cmd = "if [[ -f /var/log/start.sh.log ]] ; then tail -1 /var/log/start.sh.log; fi";
-    $this->actual_buildstatus = $this->runCommand($cmd);
     return($this->actual_buildstatus);
   }
 
   /*
    * get the status within the container, from webfact_status.sh
    */
+// XX
   public function getContainerStatus() {
-    if ($this->container_api==1) { // mesos
-      return(200);  // todo: XX
-    }
     // todo: make the command a parameter?
-    $webroot = variable_get('webfact_www_volume_path', '/var/www/html');
-    $cmd = "if [[ -d $webroot ]] && [[ -x $webroot/webfact_status.sh ]] ; then $webroot/webfact_status.sh; fi;";
-    #$cmd = "cd ${this->webroot} && ls";
-    $this->actual_status = $this->runCommand($cmd);
+    if ($this->container_api==1) { // mesos
+      // mesos: presume access to /op/sites/CONTAINER when drush can be run
+      $cmd = "cd /opt/sites/" . $this->id . "/www && drush status|grep 'Drupal version'|awk '{print $1 $4}'";
+      $res = exec("$cmd 2>&1", $outputexec, $resultexec);
+      $this->actual_status = implode(' ', $outputexec);
+
+    } else  {
+      $webroot = variable_get('webfact_www_volume_path', '/var/www/html');
+      $cmd = "if [[ -d $webroot ]] && [[ -x $webroot/webfact_status.sh ]] ; then $webroot/webfact_status.sh; fi;";
+      #$cmd = "cd ${this->webroot} && ls";
+      $this->actual_status = $this->runCommand($cmd);
+    }
     return($this->actual_status);
   }
 

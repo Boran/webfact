@@ -1834,9 +1834,10 @@ END;
 
       else if ($this->action=='druplogs') {
         if ($this->container_api == 1) {
+          // mesos: presume access to /op/sites/CONTAINER when drush can be run
           $cmd = "cd /opt/sites/" . $this->id . "/www && drush ws --count=" . variable_get('webfact_druplogs_count', 200);
-          $res = exec("sudo $cmd 2>&1", $logs, $resultexec);
-          #dpm($resultexec);
+          $res = exec("$cmd 2>&1", $outputexec, $resultexec);
+          $logs = implode('<br> ', $outputexec);
 
         } else {
           $cmd = "cd " . $this->webroot . " && drush ws --count=" . variable_get('webfact_druplogs_count', 200);

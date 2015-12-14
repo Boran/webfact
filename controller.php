@@ -198,6 +198,7 @@ END;
       if ($this->container_api == 0) {  // docker API
         $createui  = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
         $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
+        $docker_logs="<li><a href=$wpath/logs/$this->nid>Docker logs</a></li>";
       } else {
         $drupal_logs= $docker_logs ='';
         $createui  = "<li><a href=$wpath/create/$this->nid>Create</a></li>";

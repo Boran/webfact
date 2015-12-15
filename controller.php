@@ -620,15 +620,19 @@ END;
      watchdog('webfact', "renameContainer $old to $newname" . ' by ' . $this->user);
      if ($this->container_api == 1) { // mesos 
        // dont rename the container, just change the URL that bamboo uses.
-
-       #  rename metadata
+       // changer the "hostname" field, the original name for marathon is still in the marathon 
+       // field.
        $this->website->field_hostname['und'][0]['value'] = $newname;
        node_save($this->website);     // Save the updated node
        $this->website=node_load($this->website->nid);  # reload cache
+       # Update object with new name, run with apropriate params
+       $this->id=$newname;
+       $this->load_meta();
+
        $mesos = new Mesos($this->website->nid);
        $mesos->updateBamboo();
        if ($verbose==1) {
-         $this->message("Renamed meta data hostname from $old to $newname and reconfigure bamboo");
+         $this->message("Renamed hostname from $old to $newname and reconfigure bamboo");
        }
 
      } else {
@@ -684,21 +688,21 @@ END;
   
        # b) rename container
        $manager->rename($container, $newname);
+
+       # c) rename metadata
+       $this->website->field_hostname['und'][0]['value'] = $newname;
+       node_save($this->website);     // Save the updated node
+       $this->website=node_load($this->website->nid);  # reload cache
+       if ($verbose==1) {
+         $this->message("Renamed container and meta data hostname"); ##
+       }
+
+       # Update object with new name, run with apropriate params
+       $this->id=$newname;
+       $this->load_meta();
+       $this->startContainer($newname);
+
      }  // if docker
-
-
-     # c) rename metadata
-     $this->website->field_hostname['und'][0]['value'] = $newname;
-     node_save($this->website);     // Save the updated node
-     $this->website=node_load($this->website->nid);  # reload cache
-     if ($verbose==1) {
-       $this->message("Renamed container and meta data hostname"); ##
-     }
-
-     # Update object with new name, run with apropriate params
-     $this->id=$newname;
-     $this->load_meta();
-     $this->startContainer($newname);
 
      # re-make the container: 7.10.2015: disabled, do a level higher
      #$this->rebuildContainer($newname, $verbose);  
@@ -1195,12 +1199,14 @@ END;
   /*
    * get the status within the container, from webfact_status.sh
    */
-// XX
   public function getContainerStatus() {
     // todo: make the command a parameter?
     if ($this->container_api==1) { // mesos
-      // mesos: presume access to /op/sites/CONTAINER when drush can be run
-      $cmd = "cd /opt/sites/" . $this->id . "/www && drush status|grep 'Drupal version'|awk '{print $1 $4}'";
+// XX
+      // mesos: presume access to /opt/sites/CONTAINER where drush can be run
+      #$hostname = $this->id;
+      $hostname = $this->website->field_marathon_name['und'][0]['safe_value'];
+      $cmd = "cd /opt/sites/" . $hostname . "/www && drush status|grep 'Drupal version'|awk '{print $1 $4}'";
       $res = exec("$cmd 2>&1", $outputexec, $resultexec);
       $this->actual_status = implode(' ', $outputexec);
 

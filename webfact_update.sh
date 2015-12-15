@@ -1,11 +1,13 @@
 #/bin/sh
-# webfact_update.sh  : Automated procedure to update the website 
+# webfact_update.sh  : Automated procedure to update the website , managed by the Dokcer API
+#
 #
 # This is an example than can be activated by
 # ln -s /var/www/html/sites/all/modules/custom/webfact/webfact_update.sh /var/www/html/webfact_update.sh
 # or just copying into /var/www/html. Make sure it is executable.
 #
 # This example updated /var/www/html and all webfact modules from git.
+# Note: it cannot be used for Mesos.
 
 echo "___________ `date '+%Y-%m-%d %H:%M'` _________________";
 echo "Running webfact_update.sh: updating elements of a Webfactory UI";

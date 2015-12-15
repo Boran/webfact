@@ -1129,7 +1129,7 @@ END;
    */
   public function runCommand($cmd, $id='', $maxlength=8192, $verbose=0) {
     if ($this->container_api==1) { // mesos
-      return(-2);  // todo: XX
+      return(-2);  // TODO
     }
     if (strlen($id)<1) {
       $id = $this->id;
@@ -1197,23 +1197,23 @@ END;
   }
 
   /*
-   * get the status within the container, from webfact_status.sh
+   * get the status within the container e.g. for Drupal it's version
    */
   public function getContainerStatus() {
     // todo: make the command a parameter?
+
     if ($this->container_api==1) { // mesos
-// XX
       // mesos: presume access to /opt/sites/CONTAINER where drush can be run
-      #$hostname = $this->id;
-      $hostname = $this->website->field_marathon_name['und'][0]['safe_value'];
-      $cmd = "cd /opt/sites/" . $hostname . "/www && drush status|grep 'Drupal version'|awk '{print $1 $4}'";
+      #$mname = $this->id;
+      $mname = $this->website->field_marathon_name['und'][0]['safe_value'];
+      $cmd = "cd /opt/sites/" . $mname . "/www && drush status|grep 'Drupal version'|awk '{print $1 $4}'";
       $res = exec("$cmd 2>&1", $outputexec, $resultexec);
       $this->actual_status = implode(' ', $outputexec);
 
     } else  {
       $webroot = variable_get('webfact_www_volume_path', '/var/www/html');
-      $cmd = "if [[ -d $webroot ]] && [[ -x $webroot/webfact_status.sh ]] ; then $webroot/webfact_status.sh; fi;";
       #$cmd = "cd ${this->webroot} && ls";
+      $cmd = "if [[ -d $webroot ]] && [[ -x $webroot/webfact_status.sh ]] ; then $webroot/webfact_status.sh; fi;";
       $this->actual_status = $this->runCommand($cmd);
     }
     return($this->actual_status);
@@ -3272,6 +3272,31 @@ END;
       } else {
         $description.= "<div class=col-xs-4>.</div>";
       }
+
+      if (($this->container_api == 1) && ($runstatus != 'mesos-no container')) {
+        // Running container on mesos, provide links for management
+        $description.= "<div class=col-xs-2>Mesos links:</div> <div class=col-xs-10>";
+        $mesos = new Mesos($this->nid);
+        $mesosinfo=$mesos->getInfo();
+        $mname=$mesos->getMarathonName();
+        $urlpre='<a target=_blank href=' . $mesos->getMesosMaster() . '#/slaves/';
+        $rows=$mesos->getTasks();
+        foreach ($rows['tasks'] as $row) {
+          if ('/' . $mname == $row['appId']) {  // find this app
+            $description .= $urlpre . $row['slaveId']
+              . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '>mesos</a>';
+            }
+        }
+        $rows=$mesos->getApps();
+        foreach ($rows['apps'] as $row) {
+          if ('/' . $mname == $row['id']) {  // find this app
+            $description .= ' <a target=_blank href=' . $mesos->getLeader() . 'ui/#/apps/' . urlencode($row['id']) . '>marathon</a>';
+          }
+        }
+        $description.= ' <a target=_blank href= ' . $mesos->getBambooMaster() . '>bamboo</a>';
+        $description.= "</div>";
+      }
+
       $description.= '</div></div>';
     }
     $description.= '<div class="clearfix"></div>';

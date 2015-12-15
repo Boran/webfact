@@ -142,6 +142,9 @@ class Mesos
 
 
     /******** marathon ******/
+    public function getMarathonName() {
+      return $this->marathon_name;
+    }
     public function stopApp() {
       $url = $this->mserver . 'v2/apps/' . $this->marathon_name;
       try {

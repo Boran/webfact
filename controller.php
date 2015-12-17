@@ -1204,8 +1204,15 @@ END;
 
     if ($this->container_api==1) { // mesos
       // mesos: presume access to /opt/sites/CONTAINER where drush can be run
-      #$mname = $this->id;
-      $mname = $this->website->field_marathon_name['und'][0]['safe_value'];
+      if (isset($this->website->field_marathon_name['und'][0]['safe_value']))  {
+        $mname = $this->website->field_marathon_name['und'][0]['safe_value'];
+      } else {
+        $mname = $this->id;
+        $this->message('Marathon name field empty, setting to ' +$mname, 'warning');
+        $this->website->field_marathon_name['und'][0]['value'] = $this->id;
+        node_save($this->website);     // Save the updated node
+        $this->website=node_load($this->website->nid);  # reload cache
+      } 
       $cmd = "cd /opt/sites/" . $mname . "/www && drush status|grep 'Drupal version'|awk '{print $1 $4}'";
       $res = exec("$cmd 2>&1", $outputexec, $resultexec);
       $this->actual_status = implode(' ', $outputexec);

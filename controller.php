@@ -3291,9 +3291,15 @@ END;
         foreach ($rows['tasks'] as $row) {
           if ('/' . $mname == $row['appId']) {  // find this app
             $description .= $urlpre . $row['slaveId']
-              . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  . '>mesos</a>';
-            }
+              . '/frameworks/' . $mesosinfo['frameworkId'] . '/executors/' .$row['id']  
+              . '>mesos</a> ';
+            $slavehost = $row['host'];
+          }
         }
+        // find the name of the docker container
+        $containerid=$mesos->getSlaveDockerID($slavehost, $mname);
+        $description .= "(running on $slavehost with docker container=$containerid)";
+
         $rows=$mesos->getApps();
         foreach ($rows['apps'] as $row) {
           if ('/' . $mname == $row['id']) {  // find this app

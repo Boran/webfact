@@ -335,6 +335,27 @@ class Mesos
       return $result;
     }
 
+
+    /*
+     * Give Query the slve to find the nameID of a runing docker container
+     * Warning: not yet robust, just an initial POC.
+     */
+    public function getSlaveDockerID($slavehost, $job) {
+      #$url = 'http://idcprodmesos-slave2.corproot.net:5051/state.json';
+      $url = "http://$slavehost:5051/state.json";
+      $res = $this->client->get($url, [ 'auth' => ['user', 'pass'], 'proxy' => '' ]);
+      if ($res->getStatusCode()==200) {
+        $result = $res->json();
+        foreach ($result['frameworks']['0']['executors'] as $task) {
+          if (strpos($task['id'], $job .'.') ===0) {   // at string start?
+            #dpm($task);
+            return $task['container'];
+          }
+        }
+      }
+      return $result;
+    }
+
     public function getGroups() {
       $result = $this->mserver;
       $url = $this->mserver . 'v2/groups';

@@ -251,7 +251,7 @@ class Mesos
         'id' => $this->marathon_name,
         'cmd' => $cont['cmd'],
         'cpus' => 0.5,
-        'mem' => isset($cont['mem']) ? $cont['mem'] :  512.0,
+        'mem' => isset($cont['mem']) ? $cont['mem'] + 0.0 :  512.0,
         'healthChecks' => [[
             "path" => "/",
             "protocol" => "TCP",

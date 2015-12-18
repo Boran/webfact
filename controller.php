@@ -577,16 +577,18 @@ END;
        if (is_numeric($this->website->nid) ) {
          $mesos = new Mesos($this->website->nid);
          $result = implode(', ', $mesos->stopApp());
+         $result = implode(', ', $mesos->deleteApp(1));
          sleep(1); // needed?
-         $result .= '. Start=' . implode(', ', $mesos->startApp());
+         //$result .= '. Start=' . implode(', ', $mesos->startApp());
+         $this->createContainer(0);
          if ($verbose==1) {
-           $this->message('Mesos containerd stopped and started.');
+           $this->message('Mesos container stopped, deleted and recreated.');
            $this->message($result);
          }
        }  else {
          $result = "error: no nid";
          if ($verbose==1) {
-           $this->message('Mesos container restart. ' . $result);
+           $this->message('Mesos container rebuild. ' . $result);
          }
        } 
        return $result;
@@ -1081,7 +1083,11 @@ END;
     #dpm($this->restartpolicy);
 
     if (!empty($this->website->field_memory['und'][0]) ) {
-      $this->cont_mem = $this->website->field_memory['und'][0]['value'] *1024 *1024;
+      if ($this->container_api==1) { // mesos
+        $this->cont_mem = $this->website->field_memory['und'][0]['value'];
+      } else { // docker
+        $this->cont_mem = $this->website->field_memory['und'][0]['value'] *1024 *1024;
+      }
       #watchdog('webfact', 'Memory=' . $this->cont_mem);
     }
 
@@ -1597,7 +1603,7 @@ END;
             }
           }
         }
-// XX        $this->stopContainerByNid($this->nid);
+        // $this->stopContainerByNid($this->nid);
         $logs = $this->deleteContainerData($this->nid, $this->id, 1);
         $this->touch_node_date();
         $this->deleteContainerDB($this->nid, $this->id, 1);
@@ -3288,6 +3294,7 @@ END;
         $mname=$mesos->getMarathonName();
         $urlpre='<a target=_blank href=' . $mesos->getMesosMaster() . '#/slaves/';
         $rows=$mesos->getTasks();
+        $slavehost='';
         foreach ($rows['tasks'] as $row) {
           if ('/' . $mname == $row['appId']) {  // find this app
             $description .= $urlpre . $row['slaveId']
@@ -3297,8 +3304,10 @@ END;
           }
         }
         // find the name of the docker container
-        $containerid=$mesos->getSlaveDockerID($slavehost, $mname);
-        $description .= "(running on $slavehost with docker container=$containerid)";
+        if (strlen($slavehost)>0) {
+          $containerid=$mesos->getSlaveDockerID($slavehost, $mname);
+          $description .= "(running on $slavehost with docker container=$containerid)";
+        }
 
         $rows=$mesos->getApps();
         foreach ($rows['apps'] as $row) {

@@ -189,25 +189,30 @@ class WebfactController {
     $rebuild3_msg="For fast development/testing. First wipe all data, then stop, delete and recreate";
     $rebuild4_msg = "Rebuild container but maintain non-persistent data. Commit to a docker backup image, stop, delete and recreate from that same image. E.g. rebuild after changing a docker environment setting. Are you sure?";
 
+    $docker_logs='';
     // drupal specific menus
     if ($this->is_drupal==1) {  // enable drupal menus
       $coappupdate = <<<END
         <li class="divider"></li>
         <li><a href="$wpath/coappupdate/$this->nid" onclick="return confirm('Backup the container and run webfact_update.sh to update the website?')">Run website update</a></li>
 END;
+      $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
       if ($this->container_api == 0) {  // docker API
         $createui  = "<li><a href=$wpath/createui/$this->nid>Create</a></li>";
-        $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
         $docker_logs="<li><a href=$wpath/logs/$this->nid>Docker logs</a></li>";
-      } else {
-        $drupal_logs= $docker_logs ='';
+      } else { //mesos
+        $docker_logs ='';
         $createui  = "<li><a href=$wpath/create/$this->nid>Create</a></li>";
-        $drupal_logs="<li><a href=$wpath/druplogs/$this->nid>Drupal logs</a></li>";
       }
       $deletewww = "<li><a href=$wpath/deletewww/$this->nid onclick='return confirm(\"Delete persistent data from Drupal containers: Webroot and linked Database. There is no going back, are you sure?\")'>Delete Drupal data (www+DB)</a></li>";
 
     } else {   // non-drupal container
       $drupal_logs= $coappupdate= $coappupdate='';
+      if ($this->container_api == 0) {  // docker API
+        $docker_logs="<li><a href=$wpath/logs/$this->nid>Docker logs</a></li>";
+      } else { //mesos
+        $docker_logs ='';
+      }
       $createui = "<li><a href=$wpath/create/$this->nid>Create</a></li>";
       $deletewww = "";
     }
